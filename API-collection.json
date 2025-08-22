@@ -1,0 +1,366 @@
+{
+    "info": {
+      "name": "Video Transcoding System (v1)",
+      "_postman_id": "55f1c4b0-5bd3-4f64-9a2b-3f0f6c5b0abc",
+      "description": "REST API for uploading to S3 and transcoding MP4 → MKV using ffmpeg. Includes multipart upload and replace-original flows.",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+      {
+        "name": "Health",
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{baseUrl}}/health",
+            "host": ["{{baseUrl}}"],
+            "path": ["health"]
+          }
+        }
+      },
+      {
+        "name": "Auth",
+        "item": [
+          {
+            "name": "Login",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"username\": \"user1@example.com\",\n  \"password\": \"User1@123\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/auth/login",
+                "host": ["{{baseUrl}}"],
+                "path": ["api", "v1", "auth", "login"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Upload (Direct to S3)",
+        "item": [
+          {
+            "name": "1) Create Upload URL (server decides single vs multipart)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fileName\": \"lecture.mp4\",\n  \"sizeBytes\": 157286400,\n  \"contentType\": \"video/mp4\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/upload-url",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","upload-url"]
+              }
+            }
+          },
+          {
+            "name": "2a) Upload (SINGLE) via Pre‑Signed PUT URL",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Content-Type", "value": "video/mp4", "type": "text" }
+              ],
+              "body": {
+                "mode": "file",
+                "file": {
+                  "src": ""
+                }
+              },
+              "url": {
+                "raw": "{{singlePutUrl}}"
+              },
+              "description": "Set {{singlePutUrl}} from Create Upload URL response when strategy === 'single'. Choose local .mp4 file as body."
+            }
+          },
+          {
+            "name": "2b) Upload PART (MULTIPART) via Pre‑Signed URL",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Content-Type", "value": "application/octet-stream", "type": "text" }
+              ],
+              "body": {
+                "mode": "file",
+                "file": {
+                  "src": ""
+                }
+              },
+              "url": {
+                "raw": "{{partUrl}}"
+              },
+              "description": "Repeat for each part URL from Create Upload URL (strategy === 'multipart'). After each PUT, copy ETag from response headers into {{eTagN}} variables for completion."
+            }
+          },
+          {
+            "name": "3) Complete Upload (SINGLE)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"videoId\": \"{{videoId}}\",\n  \"key\": \"{{s3Key}}\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/complete-upload",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","complete-upload"]
+              }
+            }
+          },
+          {
+            "name": "3) Complete Upload (MULTIPART)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"videoId\": \"{{videoId}}\",\n  \"key\": \"{{s3Key}}\",\n  \"uploadId\": \"{{uploadId}}\",\n  \"parts\": [\n    { \"partNumber\": 1, \"eTag\": \"{{eTag1}}\" },\n    { \"partNumber\": 2, \"eTag\": \"{{eTag2}}\" }\n  ]\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/complete-upload",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","complete-upload"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Videos",
+        "item": [
+          {
+            "name": "List Videos (metadata only)",
+            "request": {
+              "method": "GET",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos?limit=10&page=1&createdBy=me&sort=createdAt:desc",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos"],
+                "query": [
+                  { "key": "limit", "value": "10" },
+                  { "key": "page", "value": "1" },
+                  { "key": "createdBy", "value": "me" },
+                  { "key": "sort", "value": "createdAt:desc" }
+                ]
+              }
+            }
+          },
+          {
+            "name": "List Videos (filter by transcode_status)",
+            "request": {
+              "method": "GET",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos?limit=10&page=1&createdBy=me&sort=createdAt:desc&filter=transcode_status:completed",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos"],
+                "query": [
+                  { "key": "limit", "value": "10" },
+                  { "key": "page", "value": "1" },
+                  { "key": "createdBy", "value": "me" },
+                  { "key": "sort", "value": "createdAt:desc" },
+                  { "key": "filter", "value": "transcode_status:completed" }
+                ]
+              }
+            }
+          },
+          {
+            "name": "Get Single Video (with variants)",
+            "request": {
+              "method": "GET",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}"]
+              }
+            }
+          },
+          {
+            "name": "Update Video Metadata",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"title\": \"Updated Lecture Title\",\n  \"description\": \"New description\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}"]
+              }
+            }
+          },
+          {
+            "name": "Delete Video",
+            "request": {
+              "method": "DELETE",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Transcode",
+        "item": [
+          {
+            "name": "Start Transcoding (mp4 → mkv)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{ \"format\": \"mkv\" }"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}/transcode",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}","transcode"]
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Replace Original",
+        "item": [
+          {
+            "name": "1) Presign URL(s) for Replacement",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fileName\": \"lecture_new.mp4\",\n  \"sizeBytes\": 157286400,\n  \"contentType\": \"video/mp4\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}/file",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}","file"]
+              }
+            }
+          },
+          {
+            "name": "2a) Upload Replacement (SINGLE) via Pre‑Signed PUT URL",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Content-Type", "value": "video/mp4", "type": "text" }
+              ],
+              "body": {
+                "mode": "file",
+                "file": { "src": "" }
+              },
+              "url": {
+                "raw": "{{singlePutUrl}}"
+              }
+            }
+          },
+          {
+            "name": "2b) Upload Replacement PART (MULTIPART) via Pre‑Signed URL",
+            "request": {
+              "method": "PUT",
+              "header": [
+                { "key": "Content-Type", "value": "application/octet-stream", "type": "text" }
+              ],
+              "body": {
+                "mode": "file",
+                "file": { "src": "" }
+              },
+              "url": { "raw": "{{partUrl}}" }
+            }
+          },
+          {
+            "name": "3) Complete Replacement (SINGLE)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"videoId\": \"{{videoId}}\",\n  \"key\": \"{{s3Key}}\"\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}/file/complete",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}","file","complete"]
+              }
+            }
+          },
+          {
+            "name": "3) Complete Replacement (MULTIPART)",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{jwtToken}}", "type": "text" },
+                { "key": "Content-Type", "value": "application/json", "type": "text" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"videoId\": \"{{videoId}}\",\n  \"key\": \"{{s3Key}}\",\n  \"uploadId\": \"{{uploadId}}\",\n  \"parts\": [\n    { \"partNumber\": 1, \"eTag\": \"{{eTag1}}\" },\n    { \"partNumber\": 2, \"eTag\": \"{{eTag2}}\" }\n  ]\n}"
+              },
+              "url": {
+                "raw": "{{baseUrl}}/api/v1/videos/{{videoId}}/file/complete",
+                "host": ["{{baseUrl}}"],
+                "path": ["api","v1","videos","{{videoId}}","file","complete"]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "variable": [
+      { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+      { "key": "jwtToken", "value": "", "type": "string" },
+      { "key": "videoId", "value": "", "type": "string" },
+      { "key": "s3Key", "value": "", "type": "string" },
+      { "key": "singlePutUrl", "value": "", "type": "string" },
+      { "key": "uploadId", "value": "", "type": "string" },
+      { "key": "partUrl", "value": "", "type": "string" },
+      { "key": "eTag1", "value": "", "type": "string" },
+      { "key": "eTag2", "value": "", "type": "string" }
+    ]
+  }
+  
