@@ -7,6 +7,7 @@ import {
     DeleteCommand
   } from '@aws-sdk/lib-dynamodb';
   import { ddbDoc, TABLE } from '../models/dynamo.js';
+  import { randomUUID } from 'node:crypto';
   
   export function nowIso() {
     return new Date().toISOString();
