@@ -1,42 +1,41 @@
 // src/routes/videos.routes.js
 import { Router } from 'express';
-import * as VideosController from '../controllers/videos.controller.js';
-import { validate } from '../middleware/validate.js';
+import { authMiddleware } from '../middleware/auth.js';
 import {
-  CreateUploadUrlSchema,
-  CompleteUploadSchema,
-  ListVideosSchema,
-  UpdateVideoSchema,
-  StartTranscodeSchema,
-  ReplaceUploadUrlSchema,
-  CompleteReplaceSchema
+  createUploadUrl,
+  completeUpload,
+  getVideo,
+  listVideos,
+  deleteVideo,
+  // If/when you implement this, uncomment the import & route:
+  // startTranscode,
+  // updateVideo,
 } from '../controllers/videos.controller.js';
 
-export const videosRouter = Router();
+const router = Router();
 
-// Upload presign (single or multipart)
-videosRouter.post('/upload-url', validate(CreateUploadUrlSchema), VideosController.createUploadUrl);
+// All routes require JWT (except /auth/login which lives in auth.routes.js)
+router.use(authMiddleware);
 
-// Complete upload (single or multipart)
-videosRouter.post('/complete-upload', validate(CompleteUploadSchema), VideosController.completeUpload);
+// 1) Create pre-signed URL(s) for upload (single or multipart)
+router.post('/videos/upload-url', createUploadUrl);
 
-// List videos
-videosRouter.get('/', validate(ListVideosSchema, 'query'), VideosController.listVideos);
+// 2) Complete upload (finalize multipart + write META + original VARIANT)
+router.post('/videos/complete-upload', completeUpload);
 
-// Get one
-videosRouter.get('/:videoId', VideosController.getVideo);
+// 3) List videos (metadata only, paginated via GSI1)
+router.get('/videos', listVideos);
 
-// Update metadata
-videosRouter.put('/:videoId', validate(UpdateVideoSchema), VideosController.updateVideo);
+// 4) Get single video (META + variants)
+router.get('/videos/:videoId', getVideo);
 
-// Start transcoding
-videosRouter.post('/:videoId/transcode', validate(StartTranscodeSchema), VideosController.startTranscoding);
+// 5) Delete video (and all variants)
+router.delete('/videos/:videoId', deleteVideo);
 
-// Delete video
-videosRouter.delete('/:videoId', VideosController.deleteVideo);
+// 6) Start transcoding to another format (optional - add when implemented)
+// router.post('/videos/:videoId/transcode', startTranscode);
 
-// Replace original: request presigned URL(s)
-videosRouter.put('/:videoId/file', validate(ReplaceUploadUrlSchema), VideosController.replaceOriginalPresign);
+// 7) Update video metadata (optional - add when implemented)
+// router.put('/videos/:videoId', updateVideo);
 
-// Complete replace
-videosRouter.post('/:videoId/file/complete', validate(CompleteReplaceSchema), VideosController.completeReplaceOriginal);
+export default router;
