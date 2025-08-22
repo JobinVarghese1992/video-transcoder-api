@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import * as AuthController from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { videosRouter } from './videos.routes.js';
+import videosRouter from './videos.routes.js';
 
 export const router = Router();
 
@@ -12,4 +12,4 @@ router.post('/auth/login', AuthController.login);
 // Protected routes
 router.use(authMiddleware);
 
-router.use('/videos', videosRouter);
+router.use('/', videosRouter);

@@ -7,8 +7,7 @@ import {
   getVideo,
   listVideos,
   deleteVideo,
-  // If/when you implement this, uncomment the import & route:
-  // startTranscode,
+  startTranscode, // ✅ added
   // updateVideo,
 } from '../controllers/videos.controller.js';
 
@@ -32,10 +31,10 @@ router.get('/videos/:videoId', getVideo);
 // 5) Delete video (and all variants)
 router.delete('/videos/:videoId', deleteVideo);
 
-// 6) Start transcoding to another format (optional - add when implemented)
-// router.post('/videos/:videoId/transcode', startTranscode);
+// 6) Start transcoding to another format
+router.post('/videos/:videoId/transcode', startTranscode); // ✅ enabled
 
-// 7) Update video metadata (optional - add when implemented)
+// 7) Update video metadata (optional)
 // router.put('/videos/:videoId', updateVideo);
 
 export default router;
