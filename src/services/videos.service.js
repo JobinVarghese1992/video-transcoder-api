@@ -13,7 +13,7 @@ import {
   }
   
   export function newVideoId() {
-    return 'vid_' + crypto.randomUUID();
+    return 'vid_' + randomUUID();;
   }
   
   export function newVariantId(videoId, seq) {
