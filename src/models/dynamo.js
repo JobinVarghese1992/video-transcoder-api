@@ -1,83 +1,59 @@
 // src/models/dynamo.js
-import {
-    DynamoDBClient,
-    CreateTableCommand,
-    UpdateTableCommand,
-    DescribeTableCommand
-  } from '@aws-sdk/client-dynamodb';
-  import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-  
-  const region = process.env.AWS_REGION || 'ap-southeast-2';
-  export const TABLE = process.env.DDB_TABLE || 'VideoTable';
-  
-  const ddb = new DynamoDBClient({ region });
-  export const ddbDoc = DynamoDBDocumentClient.from(ddb, {
-    marshallOptions: { removeUndefinedValues: true }
-  });
-  
-  export async function ensureTableAndGSI() {
-    // Ensure table exists
-    let exists = true;
-    try {
-      await ddb.send(new DescribeTableCommand({ TableName: TABLE }));
-    } catch {
-      exists = false;
-    }
-    if (!exists) {
-      await ddb.send(
-        new CreateTableCommand({
-          TableName: TABLE,
-          AttributeDefinitions: [
-            { AttributeName: 'PK', AttributeType: 'S' },
-            { AttributeName: 'SK', AttributeType: 'S' },
-            { AttributeName: 'createdBy', AttributeType: 'S' },
-            { AttributeName: 'createdAt', AttributeType: 'S' }
-          ],
-          KeySchema: [
-            { AttributeName: 'PK', KeyType: 'HASH' },
-            { AttributeName: 'SK', KeyType: 'RANGE' }
-          ],
-          BillingMode: 'PAY_PER_REQUEST',
-          GlobalSecondaryIndexes: [
-            {
-              IndexName: 'GSI1',
-              KeySchema: [
-                { AttributeName: 'createdBy', KeyType: 'HASH' },
-                { AttributeName: 'createdAt', KeyType: 'RANGE' }
-              ],
-              Projection: { ProjectionType: 'ALL' }
-            }
-          ]
-        })
-      );
-      return;
-    }
-    // Ensure GSI1 exists
-    const desc = await ddb.send(new DescribeTableCommand({ TableName: TABLE }));
-    const hasGSI =
-      desc.Table?.GlobalSecondaryIndexes?.some((g) => g.IndexName === 'GSI1') ?? false;
-    if (!hasGSI) {
-      await ddb.send(
-        new UpdateTableCommand({
-          TableName: TABLE,
-          AttributeDefinitions: [
-            { AttributeName: 'createdBy', AttributeType: 'S' },
-            { AttributeName: 'createdAt', AttributeType: 'S' }
-          ],
-          GlobalSecondaryIndexUpdates: [
-            {
-              Create: {
-                IndexName: 'GSI1',
-                KeySchema: [
-                  { AttributeName: 'createdBy', KeyType: 'HASH' },
-                  { AttributeName: 'createdAt', KeyType: 'RANGE' }
-                ],
-                Projection: { ProjectionType: 'ALL' }
-              }
-            }
-          ]
-        })
-      );
-    }
+import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
+
+const region = process.env.AWS_REGION || 'ap-southeast-2';
+export const TABLE = process.env.DDB_TABLE;
+
+const baseClient = new DynamoDBClient({ region });
+export const ddbDoc = DynamoDBDocumentClient.from(baseClient);
+
+export async function logAwsIdentity(logger) {
+  try {
+    const sts = new STSClient({ region });
+    const me = await sts.send(new GetCallerIdentityCommand({}));
+    logger?.info
+      ? logger.info({ arn: me.Arn, account: me.Account, userId: me.UserId }, 'AWS identity')
+      : console.log('AWS identity:', me);
+  } catch (e) {
+    logger?.error ? logger.error({ err: e }, 'AWS identity failed') : console.error(e);
   }
-  
+}
+
+export async function ensureTableAndGSI() {
+  if (!TABLE) throw new Error('DDB_TABLE env var is required');
+
+  try {
+    await baseClient.send(new DescribeTableCommand({ TableName: TABLE }));
+    return;
+  } catch {
+    // proceed to create
+  }
+
+  const cmd = new CreateTableCommand({
+    TableName: TABLE,
+    AttributeDefinitions: [
+      { AttributeName: 'qut-username', AttributeType: 'S' },
+      { AttributeName: 'rk', AttributeType: 'S' },
+      { AttributeName: 'createdAt', AttributeType: 'S' },
+    ],
+    KeySchema: [
+      { AttributeName: 'qut-username', KeyType: 'HASH' },
+      { AttributeName: 'rk', KeyType: 'RANGE' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'GSI1',
+        KeySchema: [
+          { AttributeName: 'qut-username', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  });
+
+  await baseClient.send(cmd);
+}
