@@ -39,3 +39,7 @@ export function requireAdminOrOwner(owner) {
     return res.status(403).json({ error: { code: 'Forbidden', message: 'Requires admin or owner' } });
   };
 }
+
+export function isAdmin(req) {
+  return (req.user?.role || '') === 'admin';
+}

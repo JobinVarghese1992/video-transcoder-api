@@ -2,6 +2,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { isAdmin } from '../middleware/auth.js';
 
 import {
   presignPutObject,
@@ -28,11 +29,16 @@ import {
 
 import { transcodeMp4ToMkvH264Aac } from '../services/ffmpeg.service.js';
 
-// Resolve "who is the user" for the partition key (CAB432 rule)
-function resolveQutUsername(req) {
-  // Always prefer env to satisfy IAM condition on partition key
-  return process.env.QUT_USERNAME || req.user?.username;
+// Resolve the DynamoDB partition (must be your SSO username for CAB432 IAM)
+function resolveQutUsername() {
+  return process.env.QUT_USERNAME;
 }
+
+// Who is the requester (from JWT) — used for app-level ownership checks
+function requesterUsername(req) {
+  return req.user?.username;
+}
+
 
 /* ------------------------------ Upload URLs ------------------------------ */
 export async function createUploadUrl(req, res, next) {
@@ -89,7 +95,8 @@ export async function completeUpload(req, res, next) {
     const size = head.ContentLength ?? 0;
 
     // Write META + original VARIANT using CAB432-compliant keys
-    const qutUsername = resolveQutUsername(req);
+    const qutUsername = resolveQutUsername();     // always SSO partition for IAM
+    const createdBy = requesterUsername(req);    // from JWT
     const now = new Date().toISOString();
 
     await putMeta({
@@ -100,9 +107,10 @@ export async function completeUpload(req, res, next) {
         title: title ?? null,
         description: description ?? null,
         createdAt: now,
-        createdBy: qutUsername,
+        createdBy,   // ✅ now the actual JWT user
       },
     });
+
 
     const originalVariantId = `${videoId}_1`;
     const getUrl = await presignGetObject({ key });
@@ -138,10 +146,18 @@ export async function completeUpload(req, res, next) {
 export async function getVideo(req, res, next) {
   try {
     const { videoId } = req.params;
-    const qutUsername = resolveQutUsername(req);
+    const qutUsername = resolveQutUsername(); // SSO partition
+    const me = requesterUsername(req);
 
     const { meta, variants } = await getVideoWithVariants({ qutUsername, videoId });
-    if (!meta) return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
+    if (!meta) {
+      return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
+    }
+
+    // RBAC: non-admin can only view their own
+    if (!isAdmin(req) && (meta.createdBy || '').toLowerCase() !== (me || '').toLowerCase()) {
+      return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
+    }
 
     return res.json({
       videoId: meta.videoId,
@@ -167,14 +183,30 @@ export async function getVideo(req, res, next) {
 /* ---------------------------------- List ---------------------------------- */
 export async function listVideos(req, res, next) {
   try {
-    const qutUsername = resolveQutUsername(req);
+    const qutUsername = resolveQutUsername(); // always SSO partition
+    const me = requesterUsername(req);
     const limit = Math.min(100, Number(req.query.limit) || 10);
     const descending = (req.query.sort ?? 'createdAt:desc').endsWith(':desc');
 
-    const { items, cursor } = await listVideosByUser({ qutUsername, limit, descending });
+    const { items, cursor } = await listVideosByUser({
+      qutUsername,
+      limit,
+      descending,
+      cursor: req.query.cursor
+    });
+
+    // Admin can see all (optionally filter by owner=?), users see only their own
+    const ownerFilter = (req.query.owner || '').trim().toLowerCase();
+    const filtered = items.filter((m) => {
+      if (isAdmin(req)) {
+        if (!ownerFilter || ownerFilter === 'all') return true;
+        return (m.createdBy || '').toLowerCase() === ownerFilter;
+      }
+      return (m.createdBy || '').toLowerCase() === (me || '').toLowerCase();
+    });
 
     return res.json({
-      videos: items.map((m) => ({
+      videos: filtered.map((m) => ({
         videoId: m.videoId,
         createdAt: m.createdAt,
         createdBy: m.createdBy,
@@ -193,13 +225,19 @@ export async function listVideos(req, res, next) {
 export async function deleteVideo(req, res, next) {
   try {
     const { videoId } = req.params;
-    const qutUsername = resolveQutUsername(req);
+    const qutUsername = resolveQutUsername(); // SSO partition
+    const me = requesterUsername(req);
 
-    const rks = await listAllRksForVideo({ qutUsername, videoId });
-    if (!rks.length) {
+    // Load meta to check ownership before deleting
+    const { meta } = await getVideoWithVariants({ qutUsername, videoId });
+    if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
     }
-    // Delete META + variants
+    if (!isAdmin(req) && (meta.createdBy || '').toLowerCase() !== (me || '').toLowerCase()) {
+      return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
+    }
+
+    const rks = await listAllRksForVideo({ qutUsername, videoId });
     for (const rk of rks) {
       await deleteByRk({ qutUsername, rk });
     }
@@ -220,19 +258,22 @@ export async function startTranscode(req, res, next) {
   try {
     const { videoId } = req.params;
     const { force } = req.body || {};
-    const qutUsername = resolveQutUsername(req);
+    const qutUsername = resolveQutUsername(); // SSO partition
+    const me = requesterUsername(req);
 
     // Load META + variants
     const { meta, variants } = await getVideoWithVariants({ qutUsername, videoId });
     if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
     }
+    // RBAC: non-admin can only act on own videos
+    if (!isAdmin(req) && (meta.createdBy || '').toLowerCase() !== (me || '').toLowerCase()) {
+      return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
+    }
 
-    // Only support mp4 -> mkv right now; ignore resolution
     const existingMkv = (variants || []).find((v) => v.format === 'mkv');
 
     if (existingMkv && existingMkv.transcode_status === 'completed' && existingMkv.url) {
-      // Already available — return it
       return res.json({
         videoId,
         variantId: existingMkv.variantId,
@@ -249,10 +290,8 @@ export async function startTranscode(req, res, next) {
       });
     }
 
-    // Create or reuse a variantId
     const variantId = existingMkv?.variantId || `${videoId}_${randomUUID().slice(0, 8)}`;
 
-    // Insert or mark processing
     if (!existingMkv) {
       await putVariant({
         qutUsername,
@@ -276,9 +315,8 @@ export async function startTranscode(req, res, next) {
       });
     }
 
-    // Respond immediately (async job continues in background)
     res.json({ videoId, variantId, status: 'processing' });
-
+    
     // --- Background job ---
     ;(async () => {
       const logger = req.app?.get('logger') || console;
