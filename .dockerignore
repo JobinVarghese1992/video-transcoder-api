@@ -1,8 +1,10 @@
 node_modules
-npm-debug.log
 .git
 .gitignore
-.DS_Store
 .env
-tmp/
-coverage/
+.env.aws
+Dockerfile*
+**/*.log
+tmp
+coverage
+

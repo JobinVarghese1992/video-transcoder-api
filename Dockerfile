@@ -1,17 +1,29 @@
-FROM node:18-bullseye-slim
+# Dockerfile (root of repo)
+FROM node:18-alpine
 
-# ffmpeg for transcoding
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
- && rm -rf /var/lib/apt/lists/*
+# Install ffmpeg (small on Alpine) and tini for clean PID1 handling
+RUN apk add --no-cache ffmpeg ca-certificates tini
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
+# Install deps first (better layer caching)
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# Copy app
 COPY . .
 
-ENV NODE_ENV=production
+# Create temp dir for jobs (matches your .env TEMP_DIR=/tmp/video-jobs)
+RUN mkdir -p /tmp/video-jobs
+
+# Health and port
 EXPOSE 3000
+
+# Drop root for safety (optional; comment out if you need root)
+# USER node
+
+# Use tini to reap zombies (esp. during ffmpeg spawns)
+ENTRYPOINT ["/sbin/tini", "--"]
+
 CMD ["node", "server.js"]
+
