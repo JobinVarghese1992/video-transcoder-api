@@ -18,6 +18,10 @@ export function signToken(payload) {
 }
 
 export function authMiddleware(req, res, next) {
+
+  // Never block CORS preflight
+  if (req.method === 'OPTIONS') return next();
+
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) {
