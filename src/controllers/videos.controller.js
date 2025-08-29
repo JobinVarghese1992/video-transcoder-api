@@ -124,7 +124,7 @@ export async function completeUpload(req, res, next) {
         resolution: 'original',
         size,
         transcode_status: 'completed',
-        url: getUrl,
+        // url: getUrl,
         createdAt: now,
       },
     });
@@ -146,9 +146,15 @@ export async function completeUpload(req, res, next) {
 export async function getVideo(req, res, next) {
   try {
     const { videoId } = req.params;
-    const qutUsername = resolveQutUsername(); // SSO partition
+
+    // Partition (SSO) and requester identity
+    const qutUsername = resolveQutUsername(); // SSO partition (unchanged)
     const me = requesterUsername(req);
 
+    // Clamp presign TTL: min 3600s, max 7d (604800s), default 900s
+    const ttl = Math.max(3600, Math.min(604800, Number(req.query.ttl) || 900));
+
+    // Load META + variants for this partition
     const { meta, variants } = await getVideoWithVariants({ qutUsername, videoId });
     if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
@@ -159,6 +165,29 @@ export async function getVideo(req, res, next) {
       return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
     }
 
+    // Fresh URL for original MP4
+    const originalKey = objectKeyOriginal(videoId, meta.fileName);
+    const originalUrl = await presignGetObject({ key: originalKey, expiresSeconds: ttl });
+
+    // Fresh URLs for completed variants; empty string otherwise
+    const variantViews = await Promise.all(
+      (variants || []).map(async (v) => {
+        let freshUrl = '';
+        if (v.transcode_status === 'completed') {
+          const vKey = objectKeyVariant(videoId, v.variantId);
+          freshUrl = await presignGetObject({ key: vKey, expiresSeconds: ttl });
+        }
+        return {
+          variantId: v.variantId,
+          format: v.format,
+          resolution: v.resolution,
+          transcode_status: v.transcode_status,
+          size: v.size ?? 0,
+          url: freshUrl,
+        };
+      })
+    );
+
     return res.json({
       videoId: meta.videoId,
       createdAt: meta.createdAt,
@@ -166,19 +195,14 @@ export async function getVideo(req, res, next) {
       fileName: meta.fileName,
       title: meta.title,
       description: meta.description,
-      variants: (variants || []).map((v) => ({
-        variantId: v.variantId,
-        format: v.format,
-        resolution: v.resolution,
-        url: v.url ?? '',
-        transcode_status: v.transcode_status,
-        size: v.size ?? 0,
-      })),
+      original: { url: originalUrl, contentType: 'video/mp4' },
+      variants: variantViews,
     });
   } catch (e) {
     next(e);
   }
 }
+
 
 /* ---------------------------------- List ---------------------------------- */
 export async function listVideos(req, res, next) {
