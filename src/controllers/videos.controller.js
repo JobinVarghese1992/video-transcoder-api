@@ -184,7 +184,7 @@ export async function getVideo(req, res, next) {
 export async function listVideos(req, res, next) {
   try {
     // Partition we must query (SSO partition, unchanged)
-    const qutUsername = resolveQutUsername(); 
+    const qutUsername = resolveQutUsername();
     const me = requesterUsername(req);
 
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 10));
@@ -204,9 +204,22 @@ export async function listVideos(req, res, next) {
       return (m.createdBy || '').toLowerCase() === ownerFilter;  // admin: specific
     };
 
+    // 🔧 Parse cursor safely (client sends encodeURIComponent(JSON.stringify(obj)))
+    let cursor = null;
+    if (req.query.cursor) {
+      try {
+        cursor = typeof req.query.cursor === 'string'
+          ? JSON.parse(req.query.cursor)
+          : req.query.cursor;
+      } catch {
+        return res
+          .status(400)
+          .json({ error: { code: 'BadCursor', message: 'cursor must be JSON-encoded LastEvaluatedKey' } });
+      }
+    }
+
     // Keep querying pages until we collect up to `limit` filtered items
     const collected = [];
-    let cursor = req.query.cursor || null;
     let nextCursor = null;
 
     while (collected.length < limit) {
