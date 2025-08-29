@@ -148,7 +148,7 @@ export async function getVideo(req, res, next) {
     const { videoId } = req.params;
 
     // Partition (SSO) and requester identity
-    const qutUsername = resolveQutUsername(); // SSO partition (unchanged)
+    const qutUsername = resolveQutUsername(); // SSO partition
     const me = requesterUsername(req);
 
     // Clamp presign TTL: min 3600s, max 7d (604800s), default 900s
@@ -165,17 +165,35 @@ export async function getVideo(req, res, next) {
       return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
     }
 
-    // Fresh URL for original MP4
+    // Fresh URL for original MP4 (convenience field)
     const originalKey = objectKeyOriginal(videoId, meta.fileName);
     const originalUrl = await presignGetObject({ key: originalKey, expiresSeconds: ttl });
 
-    // Fresh URLs for completed variants; empty string otherwise
+    // Helper: decide the S3 key for a variant
+    const s3KeyForVariant = (v) => {
+      // The “original” variant you created at complete-upload has format === 'mp4'
+      // and lives under original/<videoId>/<fileName>
+      if ((v.format || '').toLowerCase() === 'mp4') {
+        return objectKeyOriginal(videoId, meta.fileName);
+      }
+      // Transcoded outputs (e.g., mkv) live under variants/<videoId>/<variantId>.mkv
+      return objectKeyVariant(videoId, v.variantId);
+    };
+
+    // Fresh URLs per-variant (only if the object exists)
     const variantViews = await Promise.all(
       (variants || []).map(async (v) => {
         let freshUrl = '';
-        if (v.transcode_status === 'completed') {
-          const vKey = objectKeyVariant(videoId, v.variantId);
-          freshUrl = await presignGetObject({ key: vKey, expiresSeconds: ttl });
+        try {
+          // Only bother recreating URLs for items that should have an object
+          // completed -> should exist; processing/failed -> leave url empty
+          if (v.transcode_status === 'completed') {
+            const key = s3KeyForVariant(v);
+            freshUrl = await presignGetObject({ key, expiresSeconds: ttl });
+          }
+        } catch (_) {
+          // If object/key is missing (e.g., not transcoded yet), keep empty URL
+          freshUrl = '';
         }
         return {
           variantId: v.variantId,
@@ -202,7 +220,6 @@ export async function getVideo(req, res, next) {
     next(e);
   }
 }
-
 
 /* ---------------------------------- List ---------------------------------- */
 export async function listVideos(req, res, next) {
