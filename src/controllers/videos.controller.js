@@ -183,30 +183,58 @@ export async function getVideo(req, res, next) {
 /* ---------------------------------- List ---------------------------------- */
 export async function listVideos(req, res, next) {
   try {
-    const qutUsername = resolveQutUsername(); // always SSO partition
+    // Partition we must query (SSO partition, unchanged)
+    const qutUsername = resolveQutUsername(); 
     const me = requesterUsername(req);
-    const limit = Math.min(100, Number(req.query.limit) || 10);
+
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 10));
     const descending = (req.query.sort ?? 'createdAt:desc').endsWith(':desc');
 
-    const { items, cursor } = await listVideosByUser({
-      qutUsername,
-      limit,
-      descending,
-      cursor: req.query.cursor
-    });
-
-    // Admin can see all (optionally filter by owner=?), users see only their own
+    // Admin can optionally pass ?owner=<email> or ?owner=all
     const ownerFilter = (req.query.owner || '').trim().toLowerCase();
-    const filtered = items.filter((m) => {
-      if (isAdmin(req)) {
-        if (!ownerFilter || ownerFilter === 'all') return true;
-        return (m.createdBy || '').toLowerCase() === ownerFilter;
+    const isAdminUser = isAdmin(req);
+
+    // Predicate used to filter items *after* each page is fetched
+    const belongsToRequester = (m) =>
+      (m.createdBy || '').toLowerCase() === (me || '').toLowerCase();
+
+    const matchesOwner = (m) => {
+      if (!isAdminUser) return belongsToRequester(m);            // users: only own
+      if (!ownerFilter || ownerFilter === 'all') return true;    // admin: all
+      return (m.createdBy || '').toLowerCase() === ownerFilter;  // admin: specific
+    };
+
+    // Keep querying pages until we collect up to `limit` filtered items
+    const collected = [];
+    let cursor = req.query.cursor || null;
+    let nextCursor = null;
+
+    while (collected.length < limit) {
+      const { items, cursor: c } = await listVideosByUser({
+        qutUsername,
+        limit,         // page size per DDB call (you can tune this)
+        descending,
+        cursor
+      });
+
+      // Filter this page's items
+      const filtered = (items || []).filter(matchesOwner);
+      for (const m of filtered) {
+        if (collected.length < limit) collected.push(m);
+        else break;
       }
-      return (m.createdBy || '').toLowerCase() === (me || '').toLowerCase();
-    });
+
+      nextCursor = c || null;
+
+      // Stop if DDB has no more pages, or we already filled `limit`
+      if (!nextCursor || collected.length >= limit) break;
+
+      // Otherwise, continue with the next page
+      cursor = nextCursor;
+    }
 
     return res.json({
-      videos: filtered.map((m) => ({
+      videos: collected.map((m) => ({
         videoId: m.videoId,
         createdAt: m.createdAt,
         createdBy: m.createdBy,
@@ -214,7 +242,10 @@ export async function listVideos(req, res, next) {
         title: m.title,
         description: m.description,
       })),
-      pagination: { cursor },
+      // Expose the cursor to continue from where *this query* stopped.
+      // NOTE: This cursor is for the *unfiltered* stream; the client should
+      //       pass it back exactly as given for the next page.
+      pagination: { cursor: nextCursor },
     });
   } catch (e) {
     next(e);
