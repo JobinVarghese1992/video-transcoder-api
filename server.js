@@ -3,11 +3,11 @@ import 'dotenv/config';
 import express from 'express';
 import morgan from 'morgan';
 import pino from 'pino';
+import cors from 'cors';
 import { router as apiRouter } from './src/routes/index.js';
 import { errorHandler, notFoundHandler } from './src/middleware/error.js';
 import { ensureBucketAndTags } from './src/services/s3.service.js';
 import { ensureTableAndGSI, logAwsIdentity } from './src/models/dynamo.js';
-import cors from 'cors';
 
 const logger = pino({
   level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
@@ -16,30 +16,34 @@ const logger = pino({
 
 async function main() {
   const app = express();
-  
-  // CORS: allow your web client(s)
-const allowOrigins = [
-  
-  process.env.WEB_ORIGIN || 'http://localhost:5173',
-  // add your EC2-hosted web client origin here if you’ll serve it there too
-  // 'http://ec2-13-236-201-147.ap-southeast-2.compute.amazonaws.com:5173'
-  ];
-  app.use(
-    cors({
-      origin: (origin, cb) => {
-        // allow same-origin / curl (no Origin header), and any in allowlist
-        if (!origin || allowOrigins.includes(origin)) return cb(null, true);
-        return cb(new Error('Not allowed by CORS'));
-      },
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      maxAge: 600, // cache preflight 10 min
-    })
-  );
-  // make sure Express answers preflight early
-  app.options('*', cors());
-  
-  const PORT = process.env.PORT || 3000;
+  app.disable('x-powered-by');
+
+  // --- CORS (allow your web client(s)) ----------------------------------------
+  // Prefer WEB_ORIGINS (comma-separated), fallback to WEB_ORIGIN, then localhost:5173
+  const WEB_ORIGINS = (process.env.WEB_ORIGINS ?? process.env.WEB_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const corsOptions = {
+    origin: (origin, cb) => {
+      // allow same-origin/no-origin (curl/Postman) and listed web origins
+      if (!origin || WEB_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['ETag'],
+    credentials: false, // using bearer tokens, not cookies
+    maxAge: 600, // cache preflight for 10 minutes
+  };
+
+  app.use(cors(corsOptions));
+  // IMPORTANT: use the SAME options for preflight too
+  app.options('*', cors(corsOptions));
+  // ---------------------------------------------------------------------------
+
+  const PORT = Number(process.env.PORT || 3000);
 
   app.set('logger', logger);
   app.use(express.json({ limit: '2mb' }));
@@ -53,10 +57,12 @@ const allowOrigins = [
 
   // Infra checks
   await ensureBucketAndTags().catch((e) => {
-    logger.error({ err: e }, 'Failed to ensure S3 bucket/tags'); process.exit(1);
+    logger.error({ err: e }, 'Failed to ensure S3 bucket/tags');
+    process.exit(1);
   });
   await ensureTableAndGSI().catch((e) => {
-    logger.error({ err: e }, 'Failed to ensure DynamoDB table/GSI'); process.exit(1);
+    logger.error({ err: e }, 'Failed to ensure DynamoDB table/GSI');
+    process.exit(1);
   });
 
   // API v1
@@ -66,7 +72,10 @@ const allowOrigins = [
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  app.listen(PORT, () => logger.info({ port: PORT }, `Server listening on ${PORT}`));
+  // Bind to 0.0.0.0 so it is reachable externally (EC2 SG must allow the port)
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info({ port: PORT, WEB_ORIGINS }, `Server listening on 0.0.0.0:${PORT}`);
+  });
 }
 
 main().catch((err) => {
