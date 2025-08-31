@@ -132,7 +132,7 @@ export async function completeUpload(req, res, next) {
     return res.json({
       videoId,
       createdAt: now,
-      createdBy: qutUsername,
+      createdBy,
       title: title ?? null,
       description: description ?? null,
       fileName: key.split('/').pop(),
