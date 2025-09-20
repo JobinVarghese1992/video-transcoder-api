@@ -1,36 +1,38 @@
 // src/middleware/auth.js
-import jwt from 'jsonwebtoken';
+import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
-const users = [
-  { username: 'admin@example.com', password: 'Admin@123', role: 'admin' },
-  { username: 'user1@example.com', password: 'User1@123', role: 'user' },
-  { username: 'user2@example.com', password: 'User2@123', role: 'user' }
-];
+const {
+  USERPOOL_ID,
+  CLIENT_ID,
+} = process.env;
 
-export function findUser(username, password) {
-  return users.find((u) => u.username === username && u.password === password);
+const accessVerifier = CognitoJwtVerifier.create({
+  userPoolId: USERPOOL_ID,
+  tokenUse: 'access',
+  clientId: CLIENT_ID,
+});
+
+function tokenToUser(claims) {
+  const username = claims.username || claims['cognito:username'] || claims.sub;
+  const groups = claims['cognito:groups'] || [];
+  const role = groups.includes('admin') ? 'admin' : 'user';
+  return { username, role, groups };
 }
 
-export function signToken(payload) {
-  const secret = process.env.JWT_SECRET;
-  const token = jwt.sign(payload, secret, { expiresIn: 3600 });
-  return token;
-}
-
-export function authMiddleware(req, res, next) {
-
-  // Never block CORS preflight
+export async function authMiddleware(req, res, next) {
   if (req.method === 'OPTIONS') return next();
 
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+
   if (!token) {
     return res.status(401).json({ error: { code: 'Unauthorized', message: 'Missing bearer token' } });
   }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { username: decoded.username, role: decoded.role };
-    next();
+    const claims = await accessVerifier.verify(token);
+    req.user = tokenToUser(claims);
+    return next();
   } catch (e) {
     return res.status(401).json({ error: { code: 'Unauthorized', message: 'Invalid or expired token' } });
   }

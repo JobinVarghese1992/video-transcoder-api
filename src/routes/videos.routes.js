@@ -1,20 +1,16 @@
 // src/routes/videos.routes.js
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
 import {
   createUploadUrl,
   completeUpload,
   getVideo,
   listVideos,
   deleteVideo,
-  startTranscode, // ✅ added
+  startTranscode,
   // updateVideo,
 } from '../controllers/videos.controller.js';
 
 const router = Router();
-
-// All routes require JWT (except /auth/login which lives in auth.routes.js)
-router.use(authMiddleware);
 
 // 1) Create pre-signed URL(s) for upload (single or multipart)
 router.post('/videos/upload-url', createUploadUrl);
@@ -32,7 +28,7 @@ router.get('/videos/:videoId', getVideo);
 router.delete('/videos/:videoId', deleteVideo);
 
 // 6) Start transcoding to another format
-router.post('/videos/:videoId/transcode', startTranscode); // ✅ enabled
+router.post('/videos/:videoId/transcode', startTranscode);
 
 // 7) Update video metadata (optional)
 // router.put('/videos/:videoId', updateVideo);
