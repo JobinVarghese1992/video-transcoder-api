@@ -6,10 +6,10 @@ const {
   CLIENT_ID,
 } = process.env;
 
-const accessVerifier = CognitoJwtVerifier.create({
+const idVerifier = CognitoJwtVerifier.create({
   userPoolId: USERPOOL_ID,
-  tokenUse: 'access',
   clientId: CLIENT_ID,
+  tokenUse: "id",
 });
 
 function tokenToUser(claims) {
@@ -30,7 +30,7 @@ export async function authMiddleware(req, res, next) {
   }
 
   try {
-    const claims = await accessVerifier.verify(token);
+    const claims = await idVerifier.verify(token);
     req.user = tokenToUser(claims);
     return next();
   } catch (e) {
