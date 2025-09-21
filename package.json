@@ -5,30 +5,30 @@
     "main": "server.js",
     "type": "module",
     "scripts": {
-      "dev": "NODE_ENV=development node server.js",
-      "start": "NODE_ENV=production node server.js",
-      "lint": "echo \"TODO: add eslint config\" && exit 0"
+        "dev": "NODE_ENV=development node server.js",
+        "start": "NODE_ENV=production node server.js",
+        "lint": "echo \"TODO: add eslint config\" && exit 0"
     },
     "engines": {
-      "node": ">=18.19.1"
+        "node": ">=18.19.1"
     },
     "dependencies": {
-      "@aws-sdk/client-cognito-identity-provider": "^3.637.0",
+        "@aws-sdk/client-cognito-identity-provider": "^3.637.0",
       "aws-jwt-verify": "^4.0.1",
       "@aws-sdk/client-dynamodb": "^3.654.0",
-      "@aws-sdk/client-s3": "^3.654.0",
-      "@aws-sdk/lib-dynamodb": "^3.654.0",
-      "@aws-sdk/s3-request-presigner": "^3.654.0",
-      "@aws-sdk/client-sts": "^3.654.0",
-      "dotenv": "^16.4.5",
-      "express": "^4.19.2",
-      "jsonwebtoken": "^9.0.2",
-      "morgan": "^1.10.0",
-      "pino": "^9.4.0",
-      "zod": "^3.23.8"
+        "@aws-sdk/client-s3": "^3.654.0",
+        "@aws-sdk/client-sts": "^3.654.0",
+        "@aws-sdk/lib-dynamodb": "^3.654.0",
+        "@aws-sdk/s3-request-presigner": "^3.654.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.5",
+        "express": "^4.19.2",
+        "jsonwebtoken": "^9.0.2",
+        "morgan": "^1.10.0",
+        "pino": "^9.4.0",
+        "zod": "^3.23.8"
     },
     "devDependencies": {
-      "pino-pretty": "^11.2.2"
+        "pino-pretty": "^11.2.2"
     }
-  }
-  
+}

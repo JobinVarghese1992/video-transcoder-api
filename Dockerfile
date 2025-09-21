@@ -1,5 +1,5 @@
 # Dockerfile (root of repo)
-FROM node:18-alpine
+FROM node:24-alpine 
 
 # Install ffmpeg (small on Alpine) and tini for clean PID1 handling
 RUN apk add --no-cache ffmpeg ca-certificates tini
