@@ -13,7 +13,10 @@ export async function getSecret(key) {
     if (!key) throw new Error("Secret key is required");
 
     const fullName = key.startsWith("/") ? key : `${prefix}/${key}`;
-    if (cache.has(fullName)) return cache.get(fullName);
+    if (cache.has(fullName)) {
+        console.log(`Cache hit for secret "${fullName}"`);
+        return cache.get(fullName);
+    }
 
     const resp = await sm.send(new GetSecretValueCommand({ SecretId: fullName }));
     let val = resp.SecretString ?? null;
@@ -26,7 +29,7 @@ export async function getSecret(key) {
     } catch {
 
     }
-
+    console.log(`Fetched secret "${val}" from Secrets Manager`);
     cache.set(fullName, val);
     return val;
 }
