@@ -3,7 +3,7 @@ import { SSMClient, GetParametersCommand } from "@aws-sdk/client-ssm";
 
 const region = process.env.AWS_REGION || "ap-southeast-2";
 const parameterStoreName =
-    process.env.PARAMETER_STORE_NAME || "/video-transcoder/dev";
+    process.env.PARAMETER_STORE_NAME;
 
 const ssm = new SSMClient({ region });
 

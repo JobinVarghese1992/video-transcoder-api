@@ -10,15 +10,6 @@ const sm = new SecretsManagerClient({ region });
 
 const cache = new Map();
 
-function parseMaybeJSON(str) {
-    if (typeof str !== "string") return str;
-    try {
-        return JSON.parse(str);
-    } catch {
-        return str;
-    }
-}
-
 /**
  * Fetch a secret by key (automatically prefixed with SECRETS_PREFIX).
  * Example: await getSecret("JWT_SECRET")
@@ -33,7 +24,6 @@ export async function getSecret(key) {
 
     let val = resp.SecretString ?? null;
 
-    const parsed = parseMaybeJSON(val);
-    cache.set(fullName, parsed);
-    return parsed;
+    cache.set(fullName, val);
+    return val;
 }
