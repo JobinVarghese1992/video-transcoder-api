@@ -17,7 +17,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { dirname } from 'node:path';
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
-import { getParams } from './parameters.service';
+import { getParams } from './parameters.service.js';
 
 // Optional: allow forcing EC2 IMDS creds if needed
 let credentialsOpt = undefined;
@@ -27,7 +27,7 @@ if (process.env.FORCE_IMDS === 'true') {
 }
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
-const params = await getParams(["VIDEO_BUCKET", "PRESIGNED_TTL_SECONDS", "QUT_USERNAME_TAG", "PURPOSE", "QUT_USERNAME"]);
+const params = await getParams(["VIDEO_BUCKET", "PRESIGNED_TTL_SECONDS"]);
 export const BUCKET = params.VIDEO_BUCKET;
 const DEFAULT_TTL = Number(params.PRESIGNED_TTL_SECONDS || 3600);
 
@@ -92,8 +92,8 @@ export async function ensureBucketAndTags() {
 
     // 2) Ensure required tags
     const required = [
-      { Key: 'qut-username', Value: params.QUT_USERNAME || params.QUT_USERNAME_TAG || '' },
-      { Key: 'purpose', Value: params.PURPOSE || '' },
+      { Key: 'qut-username', Value: process.env.QUT_USERNAME || process.env.QUT_USERNAME_TAG || '' },
+      { Key: 'purpose', Value: process.env.PURPOSE || '' },
     ];
     let current = [];
     try {

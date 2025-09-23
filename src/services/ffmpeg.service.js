@@ -2,7 +2,7 @@
 import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { getParams } from './parameters.service';
+import { getParams } from './parameters.service.js';
 
 let resolvedFfmpeg = null;
 

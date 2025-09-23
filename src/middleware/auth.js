@@ -1,6 +1,6 @@
 // src/middleware/auth.js
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { getSecret } from '../services/secrets.service';
+import { getSecret } from '../services/secrets.service.js';
 
 const idVerifier = CognitoJwtVerifier.create({
   userPoolId: await getSecret("USERPOOL_ID"),

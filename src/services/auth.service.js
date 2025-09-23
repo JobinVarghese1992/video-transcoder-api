@@ -10,7 +10,7 @@ import {
   RespondToAuthChallengeCommand,
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { getSecret } from './secrets.service';
+import { getSecret } from './secrets.service.js';
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
 const userPoolId = await getSecret("USERPOOL_ID");
