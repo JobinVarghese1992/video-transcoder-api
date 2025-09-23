@@ -2,13 +2,9 @@
 import { SSMClient, GetParametersCommand } from "@aws-sdk/client-ssm";
 
 const region = process.env.AWS_REGION || "ap-southeast-2";
-const parameterStoreName =
-    process.env.PARAMETER_STORE_NAME;
+const parameterStoreName = process.env.PARAMETER_STORE_NAME;
 
 const ssm = new SSMClient({ region });
-
-// In-process cache: full SSM name -> value
-const cache = new Map();
 
 /** Build full SSM name: "<prefix>/<KEY>" while cleaning stray slashes */
 function fullName(key) {
@@ -24,7 +20,7 @@ function shortKey(name) {
 }
 
 /**
- * Get multiple parameters from SSM, with prefix + caching.
+ * Get multiple parameters from SSM (no cache).
  * @param {string[]} keys - e.g. ["VIDEO_BUCKET","JWT_SECRET"]
  * @param {boolean} decrypt - decrypt SecureString (default: true)
  * @returns {Promise<object>} - { KEY: value, ... }
@@ -34,43 +30,24 @@ export async function getParams(keys, decrypt = true) {
         throw new Error("At least one parameter key is required");
     }
 
-    // Map to full names
     const names = keys.map(fullName);
 
-    // Check cache first
+    const resp = await ssm.send(
+        new GetParametersCommand({
+            Names: names,
+            WithDecryption: decrypt,
+        })
+    );
+
     const result = {};
-    const missing = [];
-    for (const name of names) {
-        if (cache.has(name)) {
-            result[shortKey(name)] = cache.get(name);
-        } else {
-            missing.push(name);
-        }
+    for (const p of resp.Parameters ?? []) {
+        result[shortKey(p.Name)] = p.Value;
     }
 
-    // Fetch only the missing ones
-    if (missing.length) {
-        const resp = await ssm.send(
-            new GetParametersCommand({
-                Names: missing,
-                WithDecryption: decrypt,
-            })
-        );
-
-        for (const p of resp.Parameters ?? []) {
-            const key = shortKey(p.Name);
-            cache.set(p.Name, p.Value);
-            result[key] = p.Value;
-        }
-
-        if (resp.InvalidParameters?.length) {
-            // Convert invalid full names back to short keys for a friendlier log
-            const invalidShort = resp.InvalidParameters.map(shortKey);
-            console.warn("Missing parameters:", invalidShort);
-        }
+    if (resp.InvalidParameters?.length) {
+        const invalidShort = resp.InvalidParameters.map(shortKey);
+        console.warn("Missing parameters:", invalidShort);
     }
 
     return result;
 }
-
-// const mySecret = await getSecret("JWT_SECRET");

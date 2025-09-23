@@ -7,16 +7,10 @@ const region = process.env.AWS_REGION || "ap-southeast-2";
 const prefix = (process.env.SECRETS_PREFIX || "").replace(/\/$/, "");
 const sm = new SecretsManagerClient({ region });
 
-const cache = new Map();
-
 export async function getSecret(key) {
     if (!key) throw new Error("Secret key is required");
 
     const fullName = key.startsWith("/") ? key : `${prefix}/${key}`;
-    if (cache.has(fullName)) {
-        console.log(`Cache hit for secret "${fullName}"`);
-        return cache.get(fullName);
-    }
 
     const resp = await sm.send(new GetSecretValueCommand({ SecretId: fullName }));
     let val = resp.SecretString ?? null;
@@ -27,9 +21,9 @@ export async function getSecret(key) {
             val = parsed[key];
         }
     } catch {
-
+        // leave val as-is if not JSON
     }
+
     console.log(`Fetched secret "${val}" from Secrets Manager`);
-    cache.set(fullName, val);
     return val;
 }
