@@ -11,11 +11,13 @@ import {
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
 
+const params = await getParams(["USERPOOL_ID", "CLIENT_ID", "CLIENT_SECRET", "DEFAULT_USER_GROUP"]);
+
 const region = process.env.AWS_REGION || 'ap-southeast-2';
-const userPoolId = process.env.USERPOOL_ID;
-const clientId = process.env.CLIENT_ID;
-const clientSecret = process.env.CLIENT_SECRET;
-const defaultUserGroup = process.env.DEFAULT_USER_GROUP || 'customers';
+const userPoolId = params.USERPOOL_ID;
+const clientId = params.CLIENT_ID;
+const clientSecret = params.CLIENT_SECRET;
+const defaultUserGroup = params.DEFAULT_USER_GROUP || 'customers';
 
 const cognito = new CognitoIdentityProviderClient({ region });
 
@@ -96,12 +98,12 @@ export async function login(username, password) {
       },
     }));
 
-    
+
     if (res.ChallengeName) {
       return {
         success: true,
         challenge: res.ChallengeName,
-        session: res.Session, 
+        session: res.Session,
         parameters: res.ChallengeParameters,
         message: `Challenge required: ${res.ChallengeName}`,
       };

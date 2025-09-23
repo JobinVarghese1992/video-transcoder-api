@@ -28,10 +28,12 @@ import {
 } from '../models/videos.repo.js';
 
 import { transcodeMp4ToMkvH264Aac } from '../services/ffmpeg.service.js';
+import { getParams } from '../services/parameters.service.js';
 
 // Resolve the DynamoDB partition (must be your SSO username for CAB432 IAM)
-function resolveQutUsername() {
-  return process.env.QUT_USERNAME;
+async function resolveQutUsername() {
+  const params = await getParams(["QUT_USERNAME"]);
+  return params.QUT_USERNAME;
 }
 
 // Who is the requester (from JWT) — used for app-level ownership checks
@@ -55,8 +57,9 @@ export async function createUploadUrl(req, res, next) {
     const key = objectKeyOriginal(videoId, fileName);
 
     // Thresholds via env; default to single if small
-    const thresholdMb = Number(process.env.MULTIPART_THRESHOLD_MB || 100);
-    const partSizeMb = Math.max(5, Number(process.env.MULTIPART_PART_SIZE_MB || 10));
+    const params = await getParams(["MULTIPART_THRESHOLD_MB", "MULTIPART_PART_SIZE_MB"]);
+    const thresholdMb = Number(params.MULTIPART_THRESHOLD_MB || 100);
+    const partSizeMb = Math.max(5, Number(params.MULTIPART_PART_SIZE_MB || 10));
     const isMultipart = Number(sizeBytes) >= thresholdMb * 1024 * 1024;
 
     if (!isMultipart) {
@@ -401,9 +404,9 @@ export async function startTranscode(req, res, next) {
     }
 
     res.json({ videoId, variantId, status: 'processing' });
-    
+
     // --- Background job ---
-    ;(async () => {
+    ; (async () => {
       const logger = req.app?.get('logger') || console;
 
       try {

@@ -10,6 +10,9 @@ export async function signup(req, res, next) {
         .json({ error: { code: 'BadRequest', message: 'username, password and email are required' } });
     }
     const result = await AuthService.signup(username, password, email);
+    if (result.success === false) {
+      return res.status(400).json(result);
+    }
     console.log(result, "result from signup");
     res.status(201).json(result);
   } catch (e) {
@@ -43,6 +46,9 @@ export async function login(req, res, next) {
     }
     const result = await AuthService.login(username, password);
     console.log(result, "result from login");
+    if (result.success === false) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (e) {
     next(e);

@@ -1,14 +1,12 @@
 // src/middleware/auth.js
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import { getParams } from '../services/parameters.service';
 
-const {
-  USERPOOL_ID,
-  CLIENT_ID,
-} = process.env;
+const params = await getParams(["USERPOOL_ID", "CLIENT_ID"]);
 
 const idVerifier = CognitoJwtVerifier.create({
-  userPoolId: USERPOOL_ID,
-  clientId: CLIENT_ID,
+  userPoolId: params.USERPOOL_ID,
+  clientId: params.CLIENT_ID,
   tokenUse: "id",
 });
 

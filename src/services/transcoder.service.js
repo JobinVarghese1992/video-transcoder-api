@@ -17,11 +17,14 @@ import {
   newVariantId,
   updateVariant
 } from './videos.service.js';
+import { getParams } from './parameters.service.js';
 
-const MAX_CONCURRENCY = Number(process.env.MAX_CONCURRENT_JOBS || 0); // 0 = unlimited
-const TEMP_DIR = process.env.TEMP_DIR || '/tmp/video-jobs';
-const GET_TTL = Number(process.env.PRESIGNED_TTL_SECONDS || 3600);
-const MAX_RETRIES = Number(process.env.TRANSCODE_MAX_RETRIES || 2);
+const params = await getParams(["MAX_CONCURRENT_JOBS", "TEMP_DIR", "PRESIGNED_TTL_SECONDS", "TRANSCODE_MAX_RETRIES"]);
+
+const MAX_CONCURRENCY = Number(params.MAX_CONCURRENT_JOBS || 0); // 0 = unlimited
+const TEMP_DIR = params.TEMP_DIR || '/tmp/video-jobs';
+const GET_TTL = Number(params.PRESIGNED_TTL_SECONDS || 3600);
+const MAX_RETRIES = Number(params.TRANSCODE_MAX_RETRIES || 2);
 
 let active = 0;
 const queue = [];

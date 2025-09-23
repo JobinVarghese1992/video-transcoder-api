@@ -2,13 +2,14 @@
 import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
+import { getParams } from './parameters.service';
 
 let resolvedFfmpeg = null;
 
 async function resolveFfmpegPath() {
   if (resolvedFfmpeg) return resolvedFfmpeg;
-
-  const fromEnv = process.env.FFMPEG_PATH?.trim();
+  const params = await getParams(["FFMPEG_PATH"]);
+  const fromEnv = params.FFMPEG_PATH?.trim();
   if (fromEnv) {
     // Ensure file exists and is executable
     await access(fromEnv, fsConstants.X_OK);
@@ -24,14 +25,14 @@ async function resolveFfmpegPath() {
 
 export async function transcodeMp4ToMkvH264Aac(inputPath, outputPath) {
   const ffmpegBin = await resolveFfmpegPath();
-
+  const params = await getParams(["FFMPEG_PATH"]);
   return new Promise((resolve, reject) => {
     const args = [
       '-y',
       '-i', inputPath,
       '-c:v', 'libx264',
       '-c:a', 'aac',
-      '-preset', process.env.FFMPEG_PRESET || 'medium',
+      '-preset', params.FFMPEG_PRESET || 'medium',
       outputPath,
     ];
 
