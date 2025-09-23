@@ -1,4 +1,3 @@
-// src/config/secrets.js
 import {
     SecretsManagerClient,
     GetSecretValueCommand,
@@ -17,17 +16,15 @@ export async function getSecret(key) {
     if (cache.has(fullName)) return cache.get(fullName);
 
     const resp = await sm.send(new GetSecretValueCommand({ SecretId: fullName }));
-
     let val = resp.SecretString ?? null;
-
-    if (!val) throw new Error(`Secret ${fullName} has no value`);
 
     try {
         const parsed = JSON.parse(val);
-        if (parsed[key] !== undefined) {
+        if (parsed && typeof parsed === "object" && key in parsed) {
             val = parsed[key];
         }
     } catch {
+
     }
 
     cache.set(fullName, val);
