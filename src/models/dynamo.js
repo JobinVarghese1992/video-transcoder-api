@@ -2,7 +2,7 @@
 import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
-import { getParams } from '../services/parameters.service';
+import { getParams } from '../services/parameters.service.js';
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
 const params = await getParams(["DDB_TABLE"]);
