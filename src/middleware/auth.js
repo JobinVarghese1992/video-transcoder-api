@@ -3,8 +3,8 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { getSecret } from '../services/secrets.service.js';
 
 const idVerifier = CognitoJwtVerifier.create({
-  userPoolId: await getSecret("USERPOOL_ID"),
-  clientId: await getSecret("CLIENT_ID"),
+  userPoolId: await getSecret("COGNITO_USERPOOL_ID"),
+  clientId: await getSecret("COGNITO_CLIENT_ID"),
   tokenUse: "id",
 });
 

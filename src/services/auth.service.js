@@ -13,9 +13,9 @@ import {
 import { getSecret } from './secrets.service.js';
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
-const userPoolId = await getSecret("USERPOOL_ID");
-const clientId = await getSecret("CLIENT_ID");
-const clientSecret = await getSecret("CLIENT_SECRET");
+const userPoolId = await getSecret("COGNITO_USERPOOL_ID");
+const clientId = await getSecret("COGNITO_CLIENT_ID");
+const clientSecret = await getSecret("COGNITO_CLIENT_SECRET");
 const defaultUserGroup = 'customers';
 
 const cognito = new CognitoIdentityProviderClient({ region });
