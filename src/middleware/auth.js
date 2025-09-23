@@ -1,12 +1,10 @@
 // src/middleware/auth.js
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { getParams } from '../services/parameters.service';
-
-const params = await getParams(["USERPOOL_ID", "CLIENT_ID"]);
+import { getSecret } from '../services/secrets.service';
 
 const idVerifier = CognitoJwtVerifier.create({
-  userPoolId: params.USERPOOL_ID,
-  clientId: params.CLIENT_ID,
+  userPoolId: await getSecret("USERPOOL_ID"),
+  clientId: await getSecret("CLIENT_ID"),
   tokenUse: "id",
 });
 

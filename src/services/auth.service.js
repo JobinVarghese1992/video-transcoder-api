@@ -10,14 +10,13 @@ import {
   RespondToAuthChallengeCommand,
   AuthFlowType,
 } from '@aws-sdk/client-cognito-identity-provider';
-
-const params = await getParams(["USERPOOL_ID", "CLIENT_ID", "CLIENT_SECRET", "DEFAULT_USER_GROUP"]);
+import { getSecret } from './secrets.service';
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
-const userPoolId = params.USERPOOL_ID;
-const clientId = params.CLIENT_ID;
-const clientSecret = params.CLIENT_SECRET;
-const defaultUserGroup = params.DEFAULT_USER_GROUP || 'customers';
+const userPoolId = await getSecret("USERPOOL_ID");
+const clientId = await getSecret("CLIENT_ID");
+const clientSecret = await getSecret("CLIENT_SECRET");
+const defaultUserGroup = 'customers';
 
 const cognito = new CognitoIdentityProviderClient({ region });
 
