@@ -10,6 +10,7 @@ export async function signup(req, res, next) {
         .json({ error: { code: 'BadRequest', message: 'username, password and email are required' } });
     }
     const result = await AuthService.signup(username, password, email);
+    console.log(result, "result from signup");
     res.status(201).json(result);
   } catch (e) {
     next(e);
@@ -25,6 +26,7 @@ export async function confirmSignup(req, res, next) {
         .json({ error: { code: 'BadRequest', message: 'username and confirmation code are required' } });
     }
     const result = await AuthService.confirmSignup(username, confirmationCode);
+    console.log(result, "result from confirmSignup");
     res.json(result);
   } catch (e) {
     next(e);
@@ -40,7 +42,7 @@ export async function login(req, res, next) {
         .json({ error: { code: 'BadRequest', message: 'username and password are required' } });
     }
     const result = await AuthService.login(username, password);
-
+    console.log(result, "result from login");
     res.json(result);
   } catch (e) {
     next(e);
@@ -56,6 +58,7 @@ export async function confirmSignin(req, res, next) {
         .json({ error: { code: 'BadRequest', message: 'username, confirmationCode and session are required' } });
     }
     const result = await AuthService.confirmSignin(username, confirmationCode, session);
+    console.log(result, "result from confirmSignin");
     res.json(result);
   } catch (e) {
     next(e);
