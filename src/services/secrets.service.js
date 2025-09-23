@@ -5,15 +5,11 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 
 const region = process.env.AWS_REGION || "ap-southeast-2";
-const prefix = (process.env.SECRETS_PREFIX || "").replace(/\/$/, ""); // strip trailing slash
+const prefix = (process.env.SECRETS_PREFIX || "").replace(/\/$/, "");
 const sm = new SecretsManagerClient({ region });
 
 const cache = new Map();
 
-/**
- * Fetch a secret by key (automatically prefixed with SECRETS_PREFIX).
- * Example: await getSecret("JWT_SECRET")
- */
 export async function getSecret(key) {
     if (!key) throw new Error("Secret key is required");
 
@@ -23,6 +19,16 @@ export async function getSecret(key) {
     const resp = await sm.send(new GetSecretValueCommand({ SecretId: fullName }));
 
     let val = resp.SecretString ?? null;
+
+    if (!val) throw new Error(`Secret ${fullName} has no value`);
+
+    try {
+        const parsed = JSON.parse(val);
+        if (parsed[key] !== undefined) {
+            val = parsed[key];
+        }
+    } catch {
+    }
 
     cache.set(fullName, val);
     return val;
