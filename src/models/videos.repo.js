@@ -1,9 +1,10 @@
 // src/models/videos.repo.js
-import { ddbDoc, TABLE } from './dynamo.js';
-import { PutCommand, QueryCommand, DeleteCommand, UpdateCommand} from '@aws-sdk/lib-dynamodb';
+import { ddbDoc, getTableName } from "./dynamo.js";
+import { PutCommand, QueryCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 const rkMeta = (videoId) => `VIDEO#${videoId}#META`;
 const rkVariant = (videoId, variantId) => `VIDEO#${videoId}#VARIANT#${variantId}`;
+const TABLE = await getTableName();
 
 export async function putMeta({ qutUsername, video }) {
   return ddbDoc.send(new PutCommand({
