@@ -97,7 +97,7 @@ export async function completeUpload(req, res, next) {
     const size = head.ContentLength ?? 0;
 
     // Write META + original VARIANT using CAB432-compliant keys
-    const qutUsername = resolveQutUsername();     // always SSO partition for IAM
+    const qutUsername = await resolveQutUsername();     // always SSO partition for IAM
     const createdBy = requesterUsername(req);    // from JWT
     const now = new Date().toISOString();
 
@@ -150,7 +150,7 @@ export async function getVideo(req, res, next) {
     const { videoId } = req.params;
 
     // Partition (SSO) and requester identity
-    const qutUsername = resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername(); // SSO partition
     const me = requesterUsername(req);
 
     // Clamp presign TTL: min 3600s, max 7d (604800s), default 900s
@@ -227,7 +227,7 @@ export async function getVideo(req, res, next) {
 export async function listVideos(req, res, next) {
   try {
     // Partition we must query (SSO partition, unchanged)
-    const qutUsername = resolveQutUsername();
+    const qutUsername = await resolveQutUsername();
     const me = requesterUsername(req);
 
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 10));
@@ -312,7 +312,7 @@ export async function listVideos(req, res, next) {
 export async function deleteVideo(req, res, next) {
   try {
     const { videoId } = req.params;
-    const qutUsername = resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername(); // SSO partition
     const me = requesterUsername(req);
 
     // Load meta to check ownership before deleting
@@ -345,7 +345,7 @@ export async function startTranscode(req, res, next) {
   try {
     const { videoId } = req.params;
     const { force } = req.body || {};
-    const qutUsername = resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername(); // SSO partition
     const me = requesterUsername(req);
 
     // Load META + variants
