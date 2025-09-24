@@ -37,13 +37,23 @@ export async function logAwsIdentity(logger) {
   try {
     const sts = new STSClient({ region });
     const me = await sts.send(new GetCallerIdentityCommand({}));
-    (logger?.info ?? console.log)({
-      arn: me.Arn,
-      account: me.Account,
-      userId: me.UserId,
-    }, "AWS identity");
+
+    if (logger && typeof logger.info === "function") {
+      logger.info(
+        { arn: me.Arn, account: me.Account, userId: me.UserId },
+        "AWS identity"
+      );
+    } else {
+      console.log("AWS identity", {
+        arn: me.Arn, account: me.Account, userId: me.UserId,
+      });
+    }
   } catch (e) {
-    (logger?.error ?? console.error)({ err: e }, "AWS identity failed");
+    if (logger && typeof logger.error === "function") {
+      logger.error({ err: e }, "AWS identity failed");
+    } else {
+      console.error("AWS identity failed", e);
+    }
   }
 }
 
