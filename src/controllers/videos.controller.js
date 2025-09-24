@@ -33,6 +33,7 @@ import { getParams } from '../services/parameters.service.js';
 // Resolve the DynamoDB partition (must be your SSO username for CAB432 IAM)
 async function resolveQutUsername() {
   const params = process.env.QUT_USERNAME;
+  return params;
 }
 
 // Who is the requester (from JWT) — used for app-level ownership checks
