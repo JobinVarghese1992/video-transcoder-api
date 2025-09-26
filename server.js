@@ -75,7 +75,10 @@ async function main() {
 
   // Bind to 0.0.0.0 so it is reachable externally (EC2 SG must allow the port)
   app.listen(PORT, '0.0.0.0', () => {
-    logger.info({ port: PORT, WEB_ORIGINS }, `Server listening on 0.0.0.0:${PORT}`);
+    logger.info({
+      port: PORT
+      // , WEB_ORIGINS 
+    }, `Server listening on 0.0.0.0:${PORT}`);
   });
 }
 
