@@ -18,32 +18,31 @@ async function main() {
   const app = express();
   app.disable('x-powered-by');
 
-  // // --- CORS (allow your web client(s)) ----------------------------------------
-  // // Prefer WEB_ORIGINS (comma-separated), fallback to WEB_ORIGIN, then localhost:5173
-  // const WEB_ORIGINS = (process.env.WEB_ORIGINS ?? process.env.WEB_ORIGIN ?? 'http://localhost:5173')
-  //   .split(',')
-  //   .map((s) => s.trim())
-  //   .filter(Boolean);
+  // --- CORS (allow your web client(s)) ----------------------------------------
+  // Prefer WEB_ORIGINS (comma-separated), fallback to WEB_ORIGIN, then localhost:5173
+  const WEB_ORIGINS = (process.env.WEB_ORIGINS ?? process.env.WEB_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  // const corsOptions = {
-  //   origin: (origin, cb) => {
-  //     // allow same-origin/no-origin (curl/Postman) and listed web origins
-  //     if (!origin || WEB_ORIGINS.includes(origin)) return cb(null, true);
-  //     return cb(new Error(`Not allowed by CORS: ${origin}`));
-  //   },
-  //   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  //   allowedHeaders: ['Content-Type', 'Authorization'],
-  //   exposedHeaders: ['ETag'],
-  //   credentials: false, // using bearer tokens, not cookies
-  //   maxAge: 600, // cache preflight for 10 minutes
-  // };
+  const corsOptions = {
+    origin: (origin, cb) => {
+      // allow same-origin/no-origin (curl/Postman) and listed web origins
+      if (!origin || WEB_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['ETag'],
+    credentials: false, // using bearer tokens, not cookies
+    maxAge: 600, // cache preflight for 10 minutes
+  };
 
-  // app.use(cors(corsOptions));
-  // // IMPORTANT: use the SAME options for preflight too
-  // app.options('*', cors(corsOptions));
+  app.use(cors(corsOptions));
+  // IMPORTANT: use the SAME options for preflight too
+  app.options('*', cors(corsOptions));
   // ---------------------------------------------------------------------------
-  app.use(cors());        // allow all origins
-  app.options('*', cors());
+
   const PORT = Number(process.env.PORT || 3000);
 
   app.set('logger', logger);
@@ -75,10 +74,7 @@ async function main() {
 
   // Bind to 0.0.0.0 so it is reachable externally (EC2 SG must allow the port)
   app.listen(PORT, '0.0.0.0', () => {
-    logger.info({
-      port: PORT
-      // , WEB_ORIGINS 
-    }, `Server listening on 0.0.0.0:${PORT}`);
+    logger.info({ port: PORT, WEB_ORIGINS }, `Server listening on 0.0.0.0:${PORT}`);
   });
 }
 
