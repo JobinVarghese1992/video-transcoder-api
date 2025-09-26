@@ -4,3 +4,8 @@
 # Environment variables
 .env
 .env.aws
+
+API-collections.json
+client-upload.js
+transcode-all.js
+A1_response_to_criteria.md
