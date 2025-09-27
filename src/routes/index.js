@@ -14,7 +14,7 @@ router.post('/auth/login', AuthController.login);
 router.post('/auth/confirm-signin', AuthController.confirmSignin);
 
 // OAuth callback
-router.get('/api/v1/auth/oauth/callback', AuthController.oauthCallback);
+router.get('/auth/oauth/callback', AuthController.oauthCallback);
 
 // Protected routes
 router.use(authMiddleware);
