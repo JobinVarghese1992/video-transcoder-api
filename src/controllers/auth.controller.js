@@ -80,11 +80,11 @@ export async function oauthCallback(req, res, next) {
       return res.status(400).json({ error: { code: 'BadRequest', message: 'Missing authorization code' } });
     }
 
-    // Exchange code for tokens with Cognito
     const data = qs.stringify({
       grant_type: 'authorization_code',
       client_id: process.env.COGNITO_CLIENT_ID,
-      redirect_uri: process.env.COGNITO_REDIRECT_URI, // must match your Hosted UI config
+      client_secret: process.env.COGNITO_CLIENT_SECRET, // required if app client has a secret
+      redirect_uri: process.env.COGNITO_REDIRECT_URI,   // must match Cognito App Client config exactly
       code,
     });
 
@@ -108,7 +108,7 @@ export async function oauthCallback(req, res, next) {
       },
     });
   } catch (e) {
-    console.error('OAuth callback failed:', e?.response?.data || e.message);
+    console.error('OAuth callback failed:', e.response?.data || e.message);
     return res.status(500).json({ error: { code: 'OAuthError', message: 'Failed to exchange code for tokens' } });
   }
 }
