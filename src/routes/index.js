@@ -18,7 +18,8 @@ router.use(authMiddleware);
 router.use('/', videosRouter);
 
 // Public OAuth callback
-router.get('/api/v1/auth/oauth/callback', oauthCallback);
+// router.get('/auth/oauth/callback', AuthController.oauthCallback);
+router.get('/api/v1/auth/oauth/callback', AuthController.oauthCallback);
 
 
 
