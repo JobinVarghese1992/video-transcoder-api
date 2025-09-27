@@ -25,9 +25,10 @@ if (process.env.FORCE_IMDS === 'true') {
 }
 
 const region = process.env.AWS_REGION || 'ap-southeast-2';
-const params = await getParams(["VIDEO_BUCKET", "PRESIGNED_TTL_SECONDS"]);
+const PRESIGNED_TTL_SECONDS = process.env.PRESIGNED_TTL_SECONDS || 3600;
+const params = await getParams(["VIDEO_BUCKET"]);
 export const BUCKET = params.VIDEO_BUCKET;
-const DEFAULT_TTL = Number(params.PRESIGNED_TTL_SECONDS || 3600);
+const DEFAULT_TTL = Number(PRESIGNED_TTL_SECONDS || 3600);
 
 if (!BUCKET) {
   console.error('VIDEO_BUCKET env var is required');

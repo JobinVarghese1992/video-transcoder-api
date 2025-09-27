@@ -27,7 +27,6 @@ import {
 } from '../models/videos.repo.js';
 
 import { transcodeMp4ToMkvH264Aac } from '../services/ffmpeg.service.js';
-import { getParams } from '../services/parameters.service.js';
 
 async function resolveQutUsername() {
   const params = process.env.QUT_USERNAME;
@@ -51,9 +50,10 @@ export async function createUploadUrl(req, res, next) {
     const videoId = 'vid_' + randomUUID();
     const key = objectKeyOriginal(videoId, fileName);
 
-    const params = await getParams(["MULTIPART_THRESHOLD_MB", "MULTIPART_PART_SIZE_MB"]);
-    const thresholdMb = Number(params.MULTIPART_THRESHOLD_MB || 100);
-    const partSizeMb = Math.max(5, Number(params.MULTIPART_PART_SIZE_MB || 10));
+    const MULTIPART_THRESHOLD_MB = process.env.MULTIPART_THRESHOLD_MB;
+    const MULTIPART_PART_SIZE_MB = process.env.MULTIPART_PART_SIZE_MB;
+    const thresholdMb = Number(MULTIPART_THRESHOLD_MB || 100);
+    const partSizeMb = Math.max(5, Number(MULTIPART_PART_SIZE_MB || 10));
     const isMultipart = Number(sizeBytes) >= thresholdMb * 1024 * 1024;
 
     if (!isMultipart) {
