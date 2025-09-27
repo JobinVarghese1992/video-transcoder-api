@@ -112,3 +112,17 @@ export async function oauthCallback(req, res, next) {
     return res.status(500).json({ error: { code: 'OAuthError', message: 'Failed to exchange code for tokens' } });
   }
 }
+
+export async function logout(req, res) {
+  try {
+    const logoutUrl = `https://${process.env.COGNITO_DOMAIN}/logout?` +
+      `client_id=${process.env.COGNITO_CLIENT_ID}` +
+      `&logout_uri=${encodeURIComponent(process.env.COGNITO_LOGOUT_URI)}`;
+
+    return res.redirect(logoutUrl);
+  } catch (err) {
+    console.error('Logout failed:', err);
+    return res.status(500).json({ error: { code: 'LogoutError', message: 'Logout failed' } });
+  }
+}
+
