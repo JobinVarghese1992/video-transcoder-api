@@ -1,4 +1,3 @@
-// src/services/videos.service.js
 import {
   PutCommand,
   QueryCommand,
@@ -189,14 +188,10 @@ export async function listMetasByCreator({
 }
 
 export async function listAllMetas({ limit, exclusiveStartKey, sort = 'desc' }) {
-  // Query by PK prefix is not supported without known PKs; for demo we do a table scan substitute:
-  // Prefer using GSI1 with createdBy for user filtered lists.
   const resp = await ddbDoc.send(
     new QueryCommand({
       TableName: TABLE,
       IndexName: 'GSI1',
-      // Use createdBy as sparse index; to emulate "all", clients should call twice for each known user.
-      // For brevity we fallback to createdBy = 'admin@example.com' in demo if not specified.
       KeyConditionExpression: 'createdBy = :cb',
       ExpressionAttributeValues: { ':cb': 'admin@example.com' },
       ScanIndexForward: sort !== 'desc',

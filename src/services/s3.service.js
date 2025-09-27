@@ -1,4 +1,3 @@
-// src/services/s3.service.js
 import {
   S3Client,
   HeadBucketCommand,
@@ -19,7 +18,6 @@ import { createWriteStream, mkdirSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { getParams } from './parameters.service.js';
 
-// Optional: allow forcing EC2 IMDS creds if needed
 let credentialsOpt = undefined;
 if (process.env.FORCE_IMDS === 'true') {
   const { fromInstanceMetadata } = await import('@aws-sdk/credential-provider-imds');
@@ -32,13 +30,11 @@ export const BUCKET = params.VIDEO_BUCKET;
 const DEFAULT_TTL = Number(params.PRESIGNED_TTL_SECONDS || 3600);
 
 if (!BUCKET) {
-  // eslint-disable-next-line no-console
   console.error('VIDEO_BUCKET env var is required');
 }
 
 export const s3 = new S3Client({ region, ...(credentialsOpt || {}) });
 
-// ---- helper: retry with exponential backoff + jitter
 async function retry(fn, { retries = 5, baseMs = 200 } = {}) {
   let lastErr;
   for (let i = 0; i <= retries; i++) {
@@ -57,21 +53,19 @@ async function retry(fn, { retries = 5, baseMs = 200 } = {}) {
   throw lastErr;
 }
 
-// ---- single-flight guard so we don't create twice
 let ensureOnce;
 export async function ensureBucketAndTags() {
   if (ensureOnce) return ensureOnce;
   ensureOnce = (async () => {
     if (!BUCKET) throw new Error('VIDEO_BUCKET env var is required');
 
-    // 1) HEAD the bucket; if missing, create it (with retry for 409 races)
     let exists = true;
     try {
       await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
-      console.log(`✅ Bucket "${BUCKET}" exists`);
+      console.log(`Bucket "${BUCKET}" exists`);
     } catch (_e) {
       exists = false;
-      console.log(`⚠️ Bucket "${BUCKET}" not found. Will create...`);
+      console.log(`Bucket "${BUCKET}" not found. Will create...`);
     }
 
     if (!exists) {
@@ -87,10 +81,9 @@ export async function ensureBucketAndTags() {
           );
         }
       });
-      console.log(`📦 Created bucket "${BUCKET}" in region "${region}"`);
+      console.log(`Created bucket "${BUCKET}" in region "${region}"`);
     }
 
-    // 2) Ensure required tags
     const required = [
       { Key: 'qut-username', Value: process.env.QUT_USERNAME || process.env.QUT_USERNAME_TAG || '' },
       { Key: 'purpose', Value: process.env.PURPOSE || '' },
@@ -100,7 +93,7 @@ export async function ensureBucketAndTags() {
       const resp = await s3.send(new GetBucketTaggingCommand({ Bucket: BUCKET }));
       current = resp.TagSet || [];
     } catch {
-      console.log('ℹ️ No tags yet, applying defaults...');
+      console.log('No tags yet, applying defaults...');
     }
     const merged = Object.values(
       [...current, ...required].reduce((acc, t) => {
@@ -117,7 +110,6 @@ export async function ensureBucketAndTags() {
 
 // ---- S3 key helpers
 function sanitizeFileName(name) {
-  // Keep letters, numbers, dot, dash, underscore; replace others with '_'
   return String(name).replace(/[^\w.\-]/g, '_');
 }
 export function objectKeyOriginal(videoId, fileName) {
@@ -171,7 +163,6 @@ export async function presignUploadPartUrls({
   const partCount = Math.ceil(total / partSize);
   const entries = Array.from({ length: partCount }, (_, i) => i + 1);
 
-  // Parallelize presigning
   const urls = await Promise.all(
     entries.map(async (partNumber) => {
       const cmd = new UploadPartCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId, PartNumber: partNumber });
@@ -209,11 +200,9 @@ export async function headObject({ key }) {
 }
 
 export async function presignGetObject({ key, expiresSeconds }) {
-  // Ensure it exists (optional guard)
   try {
     await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
   } catch {
-    // ignore; GetObject presign will still be created but the GET will 404 if missing
   }
   const get = new GetObjectCommand({ Bucket: BUCKET, Key: key });
   return getSignedUrl(s3, get, { expiresIn: Number(expiresSeconds || DEFAULT_TTL) });

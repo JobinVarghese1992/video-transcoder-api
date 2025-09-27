@@ -1,4 +1,3 @@
-// src/models/dynamo.js
 import {
   DynamoDBClient,
   CreateTableCommand,
@@ -13,16 +12,15 @@ import { getParams } from "../services/parameters.service.js";
 const region = process.env.AWS_REGION || "ap-southeast-2";
 const baseClient = new DynamoDBClient({ region });
 
-// Helpful marshalling options (prevents common issues)
 export const ddbDoc = DynamoDBDocumentClient.from(baseClient, {
   marshallOptions: {
-    convertEmptyValues: true,           // "" -> {"NULL": true} compatible
-    removeUndefinedValues: true,        // drops undefined fields
-    convertClassInstanceToMap: true,    // class instances => Map attributes
+    convertEmptyValues: true,
+    removeUndefinedValues: true,
+    convertClassInstanceToMap: true,
   },
 });
 
-let TABLE; // lazy-loaded so this module can be imported without immediate I/O
+let TABLE;
 
 export async function getTableName() {
   if (!TABLE) {
@@ -60,12 +58,11 @@ export async function logAwsIdentity(logger) {
 export async function ensureTableAndGSI() {
   const tableName = await getTableName();
 
-  // Fast-path: already exists?
   try {
     await baseClient.send(new DescribeTableCommand({ TableName: tableName }));
     return;
   } catch (e) {
-    // if not found, proceed to create
+
   }
 
   const create = new CreateTableCommand({
@@ -95,13 +92,11 @@ export async function ensureTableAndGSI() {
   try {
     await baseClient.send(create);
   } catch (e) {
-    // If another instance created it in the meantime, ignore
     if (!(e instanceof ResourceInUseException)) throw e;
   }
 
-  // Wait until ACTIVE to avoid immediate write/read failures on cold start
   await waitUntilTableExists(
-    { client: baseClient, maxWaitTime: 60 }, // seconds
+    { client: baseClient, maxWaitTime: 60 },
     { TableName: tableName }
   );
 }

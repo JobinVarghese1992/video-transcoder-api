@@ -1,4 +1,3 @@
-// server.js
 import 'dotenv/config';
 import express from 'express';
 import morgan from 'morgan';
@@ -50,13 +49,10 @@ async function main() {
   app.use(express.json({ limit: '2mb' }));
   app.use(morgan('combined'));
 
-  // health
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
-  // Log the AWS identity the server is using (helps ensure SSO vs EC2 role)
   await logAwsIdentity(logger);
 
-  // Infra checks
   await ensureBucketAndTags().catch((e) => {
     logger.error({ err: e }, 'Failed to ensure S3 bucket/tags');
     process.exit(1);
@@ -66,14 +62,11 @@ async function main() {
     process.exit(1);
   });
 
-  // API v1
   app.use('/api/v1', apiRouter);
 
-  // 404 + error
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  // Bind to 0.0.0.0 so it is reachable externally (EC2 SG must allow the port)
   app.listen(PORT, '0.0.0.0', () => {
     logger.info({
       port: PORT

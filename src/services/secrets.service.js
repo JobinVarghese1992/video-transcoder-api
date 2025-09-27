@@ -21,7 +21,6 @@ export async function getSecret(key) {
             val = parsed[key];
         }
     } catch {
-        // leave val as-is if not JSON
     }
 
     console.log(`Fetched secret "${val}" from Secrets Manager`);

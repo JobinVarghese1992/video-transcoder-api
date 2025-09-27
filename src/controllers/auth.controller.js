@@ -1,4 +1,3 @@
-// src/controllers/auth.controller.js
 import * as AuthService from '../services/auth.service.js';
 
 export async function signup(req, res, next) {

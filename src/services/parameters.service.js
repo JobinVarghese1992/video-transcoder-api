@@ -1,4 +1,3 @@
-// src/config/ssm.js
 import { SSMClient, GetParametersCommand } from "@aws-sdk/client-ssm";
 
 const region = process.env.AWS_REGION || "ap-southeast-2";
@@ -6,14 +5,12 @@ const parameterStoreName = process.env.PARAMETER_STORE_NAME;
 
 const ssm = new SSMClient({ region });
 
-/** Build full SSM name: "<prefix>/<KEY>" while cleaning stray slashes */
 function fullName(key) {
     const prefix = parameterStoreName.replace(/\/$/, "");
     const k = String(key).replace(/^\//, "");
     return `${prefix}/${k}`;
 }
 
-/** Last path segment -> "KEY" */
 function shortKey(name) {
     const parts = name.split("/");
     return parts[parts.length - 1] || name;

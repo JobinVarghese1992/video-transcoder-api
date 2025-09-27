@@ -1,4 +1,3 @@
-// src/controllers/videos.controller.js
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -30,19 +29,15 @@ import {
 import { transcodeMp4ToMkvH264Aac } from '../services/ffmpeg.service.js';
 import { getParams } from '../services/parameters.service.js';
 
-// Resolve the DynamoDB partition (must be your SSO username for CAB432 IAM)
 async function resolveQutUsername() {
   const params = process.env.QUT_USERNAME;
   return params;
 }
 
-// Who is the requester (from JWT) — used for app-level ownership checks
 function requesterUsername(req) {
   return req.user?.username;
 }
 
-
-/* ------------------------------ Upload URLs ------------------------------ */
 export async function createUploadUrl(req, res, next) {
   try {
     const { fileName, sizeBytes, contentType } = req.body || {};
@@ -56,7 +51,6 @@ export async function createUploadUrl(req, res, next) {
     const videoId = 'vid_' + randomUUID();
     const key = objectKeyOriginal(videoId, fileName);
 
-    // Thresholds via env; default to single if small
     const params = await getParams(["MULTIPART_THRESHOLD_MB", "MULTIPART_PART_SIZE_MB"]);
     const thresholdMb = Number(params.MULTIPART_THRESHOLD_MB || 100);
     const partSizeMb = Math.max(5, Number(params.MULTIPART_PART_SIZE_MB || 10));
@@ -77,7 +71,6 @@ export async function createUploadUrl(req, res, next) {
   }
 }
 
-/* ------------------------------ Complete Upload ------------------------------ */
 export async function completeUpload(req, res, next) {
   try {
     const { videoId, key, uploadId, parts, title, description } = req.body || {};
@@ -85,7 +78,6 @@ export async function completeUpload(req, res, next) {
       return res.status(400).json({ error: { code: 'BadRequest', message: 'videoId and key required' } });
     }
 
-    // If multipart, finalize
     if (uploadId) {
       if (!Array.isArray(parts) || parts.length === 0) {
         return res.status(400).json({ error: { code: 'BadRequest', message: 'parts required for multipart completion' } });
@@ -93,13 +85,11 @@ export async function completeUpload(req, res, next) {
       await completeMultipart({ key, uploadId, parts });
     }
 
-    // Verify object and size
     const head = await headObject({ key });
     const size = head.ContentLength ?? 0;
 
-    // Write META + original VARIANT using CAB432-compliant keys
-    const qutUsername = await resolveQutUsername();     // always SSO partition for IAM
-    const createdBy = requesterUsername(req);    // from JWT
+    const qutUsername = await resolveQutUsername();
+    const createdBy = requesterUsername(req);
     const now = new Date().toISOString();
 
     await putMeta({
@@ -110,7 +100,7 @@ export async function completeUpload(req, res, next) {
         title: title ?? null,
         description: description ?? null,
         createdAt: now,
-        createdBy,   // ✅ now the actual JWT user
+        createdBy,
       },
     });
 
@@ -145,57 +135,43 @@ export async function completeUpload(req, res, next) {
   }
 }
 
-/* --------------------------------- Get One -------------------------------- */
 export async function getVideo(req, res, next) {
   try {
     const { videoId } = req.params;
 
-    // Partition (SSO) and requester identity
-    const qutUsername = await resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername();
     const me = requesterUsername(req);
 
-    // Clamp presign TTL: min 3600s, max 7d (604800s), default 900s
     const ttl = Math.max(3600, Math.min(604800, Number(req.query.ttl) || 900));
 
-    // Load META + variants for this partition
     const { meta, variants } = await getVideoWithVariants({ qutUsername, videoId });
     if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
     }
 
-    // RBAC: non-admin can only view their own
     if (!isAdmin(req) && (meta.createdBy || '').toLowerCase() !== (me || '').toLowerCase()) {
       return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
     }
 
-    // Fresh URL for original MP4 (convenience field)
     const originalKey = objectKeyOriginal(videoId, meta.fileName);
     const originalUrl = await presignGetObject({ key: originalKey, expiresSeconds: ttl });
 
-    // Helper: decide the S3 key for a variant
     const s3KeyForVariant = (v) => {
-      // The “original” variant you created at complete-upload has format === 'mp4'
-      // and lives under original/<videoId>/<fileName>
       if ((v.format || '').toLowerCase() === 'mp4') {
         return objectKeyOriginal(videoId, meta.fileName);
       }
-      // Transcoded outputs (e.g., mkv) live under variants/<videoId>/<variantId>.mkv
       return objectKeyVariant(videoId, v.variantId);
     };
 
-    // Fresh URLs per-variant (only if the object exists)
     const variantViews = await Promise.all(
       (variants || []).map(async (v) => {
         let freshUrl = '';
         try {
-          // Only bother recreating URLs for items that should have an object
-          // completed -> should exist; processing/failed -> leave url empty
           if (v.transcode_status === 'completed') {
             const key = s3KeyForVariant(v);
             freshUrl = await presignGetObject({ key, expiresSeconds: ttl });
           }
         } catch (_) {
-          // If object/key is missing (e.g., not transcoded yet), keep empty URL
           freshUrl = '';
         }
         return {
@@ -224,31 +200,26 @@ export async function getVideo(req, res, next) {
   }
 }
 
-/* ---------------------------------- List ---------------------------------- */
 export async function listVideos(req, res, next) {
   try {
-    // Partition we must query (SSO partition, unchanged)
     const qutUsername = await resolveQutUsername();
     const me = requesterUsername(req);
 
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 10));
     const descending = (req.query.sort ?? 'createdAt:desc').endsWith(':desc');
 
-    // Admin can optionally pass ?owner=<email> or ?owner=all
     const ownerFilter = (req.query.owner || '').trim().toLowerCase();
     const isAdminUser = isAdmin(req);
 
-    // Predicate used to filter items *after* each page is fetched
     const belongsToRequester = (m) =>
       (m.createdBy || '').toLowerCase() === (me || '').toLowerCase();
 
     const matchesOwner = (m) => {
-      if (!isAdminUser) return belongsToRequester(m);            // users: only own
-      if (!ownerFilter || ownerFilter === 'all') return true;    // admin: all
-      return (m.createdBy || '').toLowerCase() === ownerFilter;  // admin: specific
+      if (!isAdminUser) return belongsToRequester(m);
+      if (!ownerFilter || ownerFilter === 'all') return true;
+      return (m.createdBy || '').toLowerCase() === ownerFilter;
     };
 
-    // 🔧 Parse cursor safely (client sends encodeURIComponent(JSON.stringify(obj)))
     let cursor = null;
     if (req.query.cursor) {
       try {
@@ -262,19 +233,17 @@ export async function listVideos(req, res, next) {
       }
     }
 
-    // Keep querying pages until we collect up to `limit` filtered items
     const collected = [];
     let nextCursor = null;
 
     while (collected.length < limit) {
       const { items, cursor: c } = await listVideosByUser({
         qutUsername,
-        limit,         // page size per DDB call (you can tune this)
+        limit,
         descending,
         cursor
       });
 
-      // Filter this page's items
       const filtered = (items || []).filter(matchesOwner);
       for (const m of filtered) {
         if (collected.length < limit) collected.push(m);
@@ -283,10 +252,8 @@ export async function listVideos(req, res, next) {
 
       nextCursor = c || null;
 
-      // Stop if DDB has no more pages, or we already filled `limit`
       if (!nextCursor || collected.length >= limit) break;
 
-      // Otherwise, continue with the next page
       cursor = nextCursor;
     }
 
@@ -299,9 +266,6 @@ export async function listVideos(req, res, next) {
         title: m.title,
         description: m.description,
       })),
-      // Expose the cursor to continue from where *this query* stopped.
-      // NOTE: This cursor is for the *unfiltered* stream; the client should
-      //       pass it back exactly as given for the next page.
       pagination: { cursor: nextCursor },
     });
   } catch (e) {
@@ -309,14 +273,12 @@ export async function listVideos(req, res, next) {
   }
 }
 
-/* --------------------------------- Delete --------------------------------- */
 export async function deleteVideo(req, res, next) {
   try {
     const { videoId } = req.params;
-    const qutUsername = await resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername();
     const me = requesterUsername(req);
 
-    // Load meta to check ownership before deleting
     const { meta } = await getVideoWithVariants({ qutUsername, videoId });
     if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
@@ -346,15 +308,13 @@ export async function startTranscode(req, res, next) {
   try {
     const { videoId } = req.params;
     const { force } = req.body || {};
-    const qutUsername = await resolveQutUsername(); // SSO partition
+    const qutUsername = await resolveQutUsername();
     const me = requesterUsername(req);
 
-    // Load META + variants
     const { meta, variants } = await getVideoWithVariants({ qutUsername, videoId });
     if (!meta) {
       return res.status(404).json({ error: { code: 'NotFound', message: 'Video not found' } });
     }
-    // RBAC: non-admin can only act on own videos
     if (!isAdmin(req) && (meta.createdBy || '').toLowerCase() !== (me || '').toLowerCase()) {
       return res.status(403).json({ error: { code: 'Forbidden', message: 'Not your video' } });
     }
@@ -405,33 +365,26 @@ export async function startTranscode(req, res, next) {
 
     res.json({ videoId, variantId, status: 'processing' });
 
-    // --- Background job ---
     ; (async () => {
       const logger = req.app?.get('logger') || console;
 
       try {
-        // Build paths & keys
         const originalKey = objectKeyOriginal(videoId, meta.fileName);
         const tmpDir = os.tmpdir();
         const inputPath = path.join(tmpDir, `${videoId}-input.mp4`);
         const outputPath = path.join(tmpDir, `${videoId}-${variantId}.mkv`);
         const variantKey = objectKeyVariant(videoId, variantId);
 
-        // Download original MP4
         await downloadToFile({ key: originalKey, destPath: inputPath });
 
-        // Transcode locally (H.264 + AAC inside MKV)
         await transcodeMp4ToMkvH264Aac(inputPath, outputPath);
 
-        // Upload MKV back to S3
         await uploadFromFile({ key: variantKey, filePath: outputPath, contentType: 'video/x-matroska' });
 
-        // Head to get size and presign a GET URL
         const head = await headObject({ key: variantKey });
         const size = head?.ContentLength ?? 0;
         const url = await presignGetObject({ key: variantKey });
 
-        // Update variant as completed
         await updateVariant({
           qutUsername,
           videoId,

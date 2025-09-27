@@ -1,4 +1,3 @@
-// src/services/transcoder.service.js
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +20,7 @@ import { getParams } from './parameters.service.js';
 
 const params = await getParams(["MAX_CONCURRENT_JOBS", "TEMP_DIR", "PRESIGNED_TTL_SECONDS", "TRANSCODE_MAX_RETRIES"]);
 
-const MAX_CONCURRENCY = Number(params.MAX_CONCURRENT_JOBS || 0); // 0 = unlimited
+const MAX_CONCURRENCY = Number(params.MAX_CONCURRENT_JOBS || 0);
 const TEMP_DIR = params.TEMP_DIR || '/tmp/video-jobs';
 const GET_TTL = Number(params.PRESIGNED_TTL_SECONDS || 3600);
 const MAX_RETRIES = Number(params.TRANSCODE_MAX_RETRIES || 2);
@@ -51,7 +50,6 @@ function drain() {
 }
 
 async function runFfmpeg(src, out) {
-  // Always transcode to H.264 + AAC inside MKV
   const args = ['-y', '-i', src, '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '160k', out];
   return new Promise((resolve, reject) => {
     const child = spawn('ffmpeg', args);
@@ -67,7 +65,6 @@ async function runFfmpeg(src, out) {
 
 export async function startTranscodeJob({ videoId }) {
   return enqueue(async () => {
-    // Idempotency checks
     const existing = await findExistingVariant(videoId, { format: 'mkv', resolution: 'source' });
     if (existing) {
       return { variantId: existing.variantId, status: 'completed', url: existing.url };
@@ -83,7 +80,6 @@ export async function startTranscodeJob({ videoId }) {
 
     const seq = await getNextVariantSeq(videoId);
     const variantId = newVariantId(videoId, seq);
-    // Create processing record
     await createVariant({
       videoId,
       variantId,
@@ -93,7 +89,6 @@ export async function startTranscodeJob({ videoId }) {
       url: ''
     });
 
-    // Paths
     const jobDir = join(TEMP_DIR, videoId, variantId);
     const srcPath = join(jobDir, 'src.mp4');
     const outPath = join(jobDir, 'out.mkv');
@@ -105,7 +100,6 @@ export async function startTranscodeJob({ videoId }) {
     let attempt = 0;
     while (true) {
       try {
-        // Download → Transcode → Upload
         await downloadToFile({ key: srcKey, destPath: srcPath });
         await runFfmpeg(srcPath, outPath);
         await uploadFromFile({
@@ -131,7 +125,6 @@ export async function startTranscodeJob({ videoId }) {
           rmSync(jobDir, { recursive: true, force: true });
           throw err;
         } else {
-          // Exponential backoff
           await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
         }
       }

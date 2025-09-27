@@ -1,4 +1,3 @@
-// src/models/videos.repo.js
 import { ddbDoc, getTableName } from "./dynamo.js";
 import { PutCommand, QueryCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
@@ -12,7 +11,7 @@ export async function putMeta({ qutUsername, video }) {
     Item: {
       'qut-username': qutUsername,
       rk: rkMeta(video.videoId),
-      ...video, // includes createdAt for GSI1
+      ...video,
     },
     ConditionExpression: 'attribute_not_exists(#rk)',
     ExpressionAttributeNames: { '#rk': 'rk' },
@@ -105,7 +104,6 @@ export async function updateVariant({ qutUsername, videoId, variantId, patch }) 
       UpdateExpression,
       ExpressionAttributeNames: expNames,
       ExpressionAttributeValues: expVals,
-      // Optional: ensure we only update an existing item
       ConditionExpression: 'attribute_exists(rk)',
     }),
   );

@@ -1,4 +1,3 @@
-// src/services/auth.service.js
 import 'dotenv/config';
 import crypto from 'crypto';
 import {

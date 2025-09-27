@@ -1,4 +1,3 @@
-// src/services/ffmpeg.service.js
 import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
@@ -11,14 +10,11 @@ async function resolveFfmpegPath() {
   const params = await getParams(["FFMPEG_PATH"]);
   const fromEnv = params.FFMPEG_PATH?.trim();
   if (fromEnv) {
-    // Ensure file exists and is executable
     await access(fromEnv, fsConstants.X_OK);
     resolvedFfmpeg = fromEnv;
     return resolvedFfmpeg;
   }
 
-  // Fallback: rely on PATH. We can't reliably probe PATH on all shells here,
-  // so we assume 'ffmpeg' is resolvable by the OS if installed.
   resolvedFfmpeg = 'ffmpeg';
   return resolvedFfmpeg;
 }
@@ -41,7 +37,6 @@ export async function transcodeMp4ToMkvH264Aac(inputPath, outputPath) {
     let stderr = '';
     proc.stderr.on('data', (d) => (stderr += d.toString()));
     proc.on('error', (err) => {
-      // If ENOENT, give a nicer hint
       if (err?.code === 'ENOENT') {
         err.message =
           `ffmpeg not found. Install ffmpeg or set FFMPEG_PATH to the binary.\n` +
