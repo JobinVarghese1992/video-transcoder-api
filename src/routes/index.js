@@ -13,14 +13,11 @@ router.post('/auth/confirm-signup', AuthController.confirmSignup);
 router.post('/auth/login', AuthController.login);
 router.post('/auth/confirm-signin', AuthController.confirmSignin);
 
+// OAuth callback
+router.get('/api/v1/auth/oauth/callback', AuthController.oauthCallback);
+
 // Protected routes
 router.use(authMiddleware);
 router.use('/', videosRouter);
-
-// Public OAuth callback
-// router.get('/auth/oauth/callback', AuthController.oauthCallback);
-router.get('/api/v1/auth/oauth/callback', AuthController.oauthCallback);
-
-
 
 export default router;
