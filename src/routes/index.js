@@ -17,4 +17,8 @@ router.post('/auth/confirm-signin', AuthController.confirmSignin);
 router.use(authMiddleware);
 router.use('/', videosRouter);
 
+// Public OAuth callback
+router.get('/auth/oauth/callback', AuthController.oauthCallback);
+
+
 export default router;

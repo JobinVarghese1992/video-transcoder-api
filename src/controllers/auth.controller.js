@@ -1,4 +1,6 @@
 // src/controllers/auth.controller.js
+import axios from 'axios';
+import qs from 'querystring';
 import * as AuthService from '../services/auth.service.js';
 
 export async function signup(req, res, next) {
@@ -68,5 +70,45 @@ export async function confirmSignin(req, res, next) {
     res.json(result);
   } catch (e) {
     next(e);
+  }
+}
+
+export async function oauthCallback(req, res, next) {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.status(400).json({ error: { code: 'BadRequest', message: 'Missing authorization code' } });
+    }
+
+    // Exchange code for tokens with Cognito
+    const data = qs.stringify({
+      grant_type: 'authorization_code',
+      client_id: process.env.COGNITO_CLIENT_ID,
+      redirect_uri: process.env.COGNITO_REDIRECT_URI, // must match your Hosted UI config
+      code,
+    });
+
+    const response = await axios.post(
+      `https://${process.env.COGNITO_DOMAIN}/oauth2/token`,
+      data,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const { id_token, access_token, refresh_token, expires_in, token_type } = response.data;
+
+    return res.json({
+      success: true,
+      message: 'Federated login successful.',
+      data: {
+        idToken: id_token,
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        tokenType: token_type,
+        expiresIn: expires_in,
+      },
+    });
+  } catch (e) {
+    console.error('OAuth callback failed:', e?.response?.data || e.message);
+    return res.status(500).json({ error: { code: 'OAuthError', message: 'Failed to exchange code for tokens' } });
   }
 }
