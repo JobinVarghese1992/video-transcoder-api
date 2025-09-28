@@ -1,3 +1,6 @@
+// src/controllers/auth.controller.js
+import axios from 'axios';
+import qs from 'querystring';
 import * as AuthService from '../services/auth.service.js';
 
 export async function signup(req, res, next) {
@@ -69,3 +72,55 @@ export async function confirmSignin(req, res, next) {
     next(e);
   }
 }
+
+// src/controllers/oauth.controller.js
+import axios from 'axios';
+import qs from 'qs';
+
+export async function oauthCallback(req, res) {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.status(400).json({ error: { code: 'BadRequest', message: 'Missing authorization code' } });
+    }
+
+    const data = qs.stringify({
+      grant_type: 'authorization_code',
+      client_id: await getSecret("COGNITO_CLIENT_ID"),
+      client_secret: await getSecret("COGNITO_CLIENT_SECRET"),
+      redirect_uri: process.env.COGNITO_REDIRECT_URI,
+      code,
+    });
+
+    const tokenResp = await axios.post(
+      `https://${process.env.COGNITO_DOMAIN}/oauth2/token`,
+      data,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const { id_token, access_token } = tokenResp.data;
+
+    const url = new URL(process.env.APP_HOME_URL);
+    url.searchParams.set('id_token', id_token);
+    url.searchParams.set('access_token', access_token);
+
+    return res.redirect(url.toString());
+  } catch (e) {
+    console.error('OAuth callback failed:', e.response?.data || e.message);
+    return res.status(500).json({ error: { code: 'OAuthError', message: 'Failed to exchange code for tokens' } });
+  }
+}
+
+export async function logout(req, res) {
+  try {
+    const logoutUrl = `https://${process.env.COGNITO_DOMAIN}/logout?` +
+      `client_id=${process.env.COGNITO_CLIENT_ID}` +
+      `&logout_uri=${encodeURIComponent(process.env.COGNITO_LOGOUT_URI)}`;
+
+    return res.redirect(logoutUrl);
+  } catch (err) {
+    console.error('Logout failed:', err);
+    return res.status(500).json({ error: { code: 'LogoutError', message: 'Logout failed' } });
+  }
+}
+
