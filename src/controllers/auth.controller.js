@@ -2,6 +2,7 @@
 import axios from 'axios';
 import qs from 'querystring';
 import * as AuthService from '../services/auth.service.js';
+import { getSecret } from '../services/secrets.service.js';
 
 export async function signup(req, res, next) {
   try {
@@ -82,8 +83,8 @@ export async function oauthCallback(req, res) {
 
     const data = qs.stringify({
       grant_type: 'authorization_code',
-      client_id: process.env.COGNITO_CLIENT_ID,
-      ...(process.env.COGNITO_CLIENT_SECRET ? { client_secret: process.env.COGNITO_CLIENT_SECRET } : {}),
+      client_id: await getSecret("COGNITO_CLIENT_ID"),
+      client_secret: await getSecret("COGNITO_CLIENT_SECRET"),
       redirect_uri: process.env.COGNITO_REDIRECT_URI,
       code,
     });
@@ -96,7 +97,6 @@ export async function oauthCallback(req, res) {
 
     const { id_token, access_token } = tokenResp.data;
 
-    // Redirect back to your frontend with tokens in the query string
     const url = new URL(process.env.APP_HOME_URL);
     url.searchParams.set('id_token', id_token);
     url.searchParams.set('access_token', access_token);
