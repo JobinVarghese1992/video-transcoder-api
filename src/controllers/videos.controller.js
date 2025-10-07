@@ -300,7 +300,7 @@ export async function deleteVideo(req, res, next) {
 
 /* ------------------------------- Transcoding ------------------------------- */
 const sqs = new SQSClient({ region: process.env.AWS_REGION || 'ap-southeast-2' });
-const QUEUE_URL = process.env.SQS_QUEUE_URL;
+const QUEUE_URL = process.env.JOBS_QUEUE_URL;
 
 export async function startTranscode(req, res, next) {
   try {
@@ -370,7 +370,7 @@ export async function startTranscode(req, res, next) {
         variantId,
         patch: { transcode_status: 'failed' },
       });
-      return res.status(500).json({ error: { code: 'Config', message: 'SQS_QUEUE_URL is not set' } });
+      return res.status(500).json({ error: { code: 'Config', message: 'JOBS_QUEUE_URL is not set' } });
     }
 
     const originalKey = objectKeyOriginal(videoId, meta.fileName);
