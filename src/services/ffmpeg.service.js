@@ -7,13 +7,13 @@ let resolvedFfmpeg = null;
 
 async function resolveFfmpegPath() {
   if (resolvedFfmpeg) return resolvedFfmpeg;
-  const params = await getParams(["FFMPEG_PATH"]);
-  const fromEnv = params.FFMPEG_PATH?.trim();
-  if (fromEnv) {
-    await access(fromEnv, fsConstants.X_OK);
-    resolvedFfmpeg = fromEnv;
-    return resolvedFfmpeg;
-  }
+  // const params = await getParams(["FFMPEG_PATH"]);
+  // const fromEnv = params.FFMPEG_PATH?.trim();
+  // if (fromEnv) {
+  //   await access(fromEnv, fsConstants.X_OK);
+  //   resolvedFfmpeg = fromEnv;
+  //   return resolvedFfmpeg;
+  // }
 
   resolvedFfmpeg = 'ffmpeg';
   return resolvedFfmpeg;
@@ -21,14 +21,13 @@ async function resolveFfmpegPath() {
 
 export async function transcodeMp4ToMkvH264Aac(inputPath, outputPath) {
   const ffmpegBin = await resolveFfmpegPath();
-  const params = await getParams(["FFMPEG_PATH"]);
   return new Promise((resolve, reject) => {
     const args = [
       '-y',
       '-i', inputPath,
       '-c:v', 'libx264',
       '-c:a', 'aac',
-      '-preset', params.FFMPEG_PRESET || 'medium',
+      '-preset', 'medium',
       outputPath,
     ];
 

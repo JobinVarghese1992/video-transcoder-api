@@ -27,6 +27,7 @@ import {
 } from '../models/videos.repo.js';
 
 import { transcodeMp4ToMkvH264Aac } from '../services/ffmpeg.service.js';
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 async function resolveQutUsername() {
   const params = process.env.QUT_USERNAME;
@@ -298,12 +299,9 @@ export async function deleteVideo(req, res, next) {
 }
 
 /* ------------------------------- Transcoding ------------------------------- */
-/**
- * Start async transcode of original MP4 → MKV (H.264 + AAC)
- * POST /api/v1/videos/:videoId/transcode
- * Body: {}   // resolution ignored for v1
- * Response: { videoId, variantId, status: 'processing' | 'already_exists' }
- */
+const sqs = new SQSClient({ region: process.env.AWS_REGION || 'ap-southeast-2' });
+const QUEUE_URL = process.env.SQS_QUEUE_URL;
+
 export async function startTranscode(req, res, next) {
   try {
     const { videoId } = req.params;
@@ -363,50 +361,50 @@ export async function startTranscode(req, res, next) {
       });
     }
 
-    res.json({ videoId, variantId, status: 'processing' });
+    // --- NEW: enqueue a job to SQS for the worker service ---
+    if (!QUEUE_URL) {
+      // If enqueue fails due to bad config, revert state to avoid “stuck processing”
+      await updateVariant({
+        qutUsername,
+        videoId,
+        variantId,
+        patch: { transcode_status: 'failed' },
+      });
+      return res.status(500).json({ error: { code: 'Config', message: 'SQS_QUEUE_URL is not set' } });
+    }
 
-    ; (async () => {
-      const logger = req.app?.get('logger') || console;
+    const originalKey = objectKeyOriginal(videoId, meta.fileName);
+    const variantKey = objectKeyVariant(videoId, variantId);
 
-      try {
-        const originalKey = objectKeyOriginal(videoId, meta.fileName);
-        const tmpDir = os.tmpdir();
-        const inputPath = path.join(tmpDir, `${videoId}-input.mp4`);
-        const outputPath = path.join(tmpDir, `${videoId}-${variantId}.mkv`);
-        const variantKey = objectKeyVariant(videoId, variantId);
+    const message = {
+      videoId,
+      variantId,
+      qutUsername,                 // DDB partition key
+      createdBy: me,               // optional auditing
+      fileName: meta.fileName,
+      originalKey,                 // s3 key to download
+      variantKey,                  // s3 key to upload
+      // Optional knobs:
+      // preset: 'medium',
+      // expiresSeconds: 3600,
+      // attempt: 1
+    };
 
-        await downloadToFile({ key: originalKey, destPath: inputPath });
+    // Tip: for idempotency, send a MessageGroupId/MessageDeduplicationId if FIFO,
+    // but we’re using Standard SQS so we rely on your worker to be idempotent.
+    await sqs.send(new SendMessageCommand({
+      QueueUrl: QUEUE_URL,
+      MessageBody: JSON.stringify(message),
+      // Optional attributes for filtering/ops:
+      MessageAttributes: {
+        type: { DataType: 'String', StringValue: 'transcode' },
+        format: { DataType: 'String', StringValue: 'mkv' },
+      },
+    }));
 
-        await transcodeMp4ToMkvH264Aac(inputPath, outputPath);
-
-        await uploadFromFile({ key: variantKey, filePath: outputPath, contentType: 'video/x-matroska' });
-
-        const head = await headObject({ key: variantKey });
-        const size = head?.ContentLength ?? 0;
-        const url = await presignGetObject({ key: variantKey });
-
-        await updateVariant({
-          qutUsername,
-          videoId,
-          variantId,
-          patch: { transcode_status: 'completed', url, size },
-        });
-
-        logger.info?.({ videoId, variantId }, 'Transcode completed');
-      } catch (err) {
-        const logger = req.app?.get('logger') || console;
-        logger.error?.({ err, videoId, variantId }, 'Transcode failed');
-        try {
-          await updateVariant({
-            qutUsername,
-            videoId,
-            variantId,
-            patch: { transcode_status: 'failed' },
-          });
-        } catch (_) { /* ignore */ }
-      }
-    })();
+    // Respond immediately; worker will update the variant later
+    return res.json({ videoId, variantId, status: 'queued' });
   } catch (e) {
-    next(e);
+    return next(e);
   }
 }
