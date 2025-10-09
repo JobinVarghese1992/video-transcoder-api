@@ -1,19 +1,9 @@
 import { spawn } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { constants as fsConstants } from 'node:fs';
-import { getParams } from './parameters.service.js';
 
 let resolvedFfmpeg = null;
 
 async function resolveFfmpegPath() {
   if (resolvedFfmpeg) return resolvedFfmpeg;
-  // const params = await getParams(["FFMPEG_PATH"]);
-  // const fromEnv = params.FFMPEG_PATH?.trim();
-  // if (fromEnv) {
-  //   await access(fromEnv, fsConstants.X_OK);
-  //   resolvedFfmpeg = fromEnv;
-  //   return resolvedFfmpeg;
-  // }
 
   resolvedFfmpeg = 'ffmpeg';
   return resolvedFfmpeg;

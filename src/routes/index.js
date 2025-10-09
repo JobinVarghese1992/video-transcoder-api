@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import * as AuthController from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { authJob } from '../middleware/workerauth.js';
 import videosRouter from './videos.routes.js';
+import { jobStatus } from '../controllers/worker.controller.js';
 
 export const router = Router();
 
@@ -46,6 +48,8 @@ router.get('/logout', (req, res) => {
   `);
 });
 
+//Worker
+router.post('/job-status', authJob, jobStatus);
 
 // Protected routes
 router.use(authMiddleware);
