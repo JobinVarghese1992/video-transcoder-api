@@ -1,0 +1,21 @@
+# worker/Dockerfile
+FROM node:24-alpine
+
+# Install ffmpeg (for transcoding) and tini (for PID handling)
+RUN apk add --no-cache ffmpeg tini ca-certificates
+
+WORKDIR /app
+
+# Copy only worker dependencies first
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy worker code
+COPY . .
+
+# Environment variables
+ENV NODE_ENV=production
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "worker.js"]

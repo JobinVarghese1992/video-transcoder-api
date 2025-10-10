@@ -3,8 +3,8 @@ import {
     ReceiveMessageCommand,
     DeleteMessageCommand,
 } from "@aws-sdk/client-sqs";
-import { downloadToFile, uploadFromFile, headObject, presignGetObject } from "./s3.service.js";
-import { transcodeMp4ToMkvH264Aac } from "./ffmpeg.service.js";
+import { downloadToFile, uploadFromFile, headObject, presignGetObject } from "./services/s3.service.js";
+import { transcodeMp4ToMkvH264Aac } from "./services/ffmpeg.service.js";
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";

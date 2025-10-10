@@ -1,0 +1,17 @@
+{
+  "name": "video-transcoder-worker",
+  "version": "1.0.0",
+  "description": "Worker service for processing video transcode jobs via SQS",
+  "type": "module",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/client-ssm": "^3.637.0",
+    "@aws-sdk/client-sqs": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0",
+    "axios": "^1.7.3"
+  }
+}

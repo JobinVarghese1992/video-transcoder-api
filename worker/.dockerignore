@@ -8,6 +8,3 @@ Dockerfile*
 tmp
 coverage
 
-# exclude the worker from this image
-worker/
-worker/**
