@@ -11,3 +11,5 @@ coverage
 # exclude the worker from this image
 worker/
 worker/**
+thumbnail-service/
+thumbnail-service/**
