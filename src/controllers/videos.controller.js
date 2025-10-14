@@ -133,7 +133,8 @@ export async function completeUpload(req, res, next) {
       const { thumbnail_url } = await presignPutThumbnail({ id: videoId });
       const result = await generateThumbnail({
         videoUrl: originalUrl,
-        thumbnailUrl: thumbnail_url
+        thumbnailUrl: thumbnail_url,
+        id: videoId
       });
 
       console.log("Thumbnail OK:", result);
