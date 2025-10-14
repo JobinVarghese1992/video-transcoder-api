@@ -457,6 +457,7 @@ export async function generateThumbnail({
   apiBase = process.env.THUMBNAIL_SERVICE_URL, // e.g., http://localhost:8080
   videoUrl,
   thumbnailUrl,
+  id,
   at = 2.5,           // seconds into the video
   width = 640,        // output width
   format = "jpg",     // "jpg" | "png"
@@ -481,6 +482,7 @@ export async function generateThumbnail({
       body: JSON.stringify({
         videoUrl,
         thumbnailUrl,
+        id,
         at,
         width,
         format,
