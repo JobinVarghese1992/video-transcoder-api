@@ -1,6 +1,7 @@
 # Dependencies
 /node_modules
 /worker/node_modules
+/thumbnail-service/node_modules
 
 # Environment variables
 .env
