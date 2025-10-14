@@ -14,6 +14,8 @@ import {
   objectKeyVariant,
   downloadToFile,
   uploadFromFile,
+  presignPutThumbnail,
+  presignGetThumbnailJpg
 } from '../services/s3.service.js';
 
 import {
@@ -122,6 +124,24 @@ export async function completeUpload(req, res, next) {
         createdAt: now,
       },
     });
+
+    // Create thumbnail
+    try {
+      const { meta } = await getVideoWithVariants({ qutUsername, videoId });
+      const originalKey = objectKeyOriginal(videoId, meta.fileName);
+      const originalUrl = await presignGetObject({ key: originalKey, expiresSeconds: 3600 });
+      const { thumbnail_url } = await presignPutThumbnail({ id: videoId });
+      const result = await generateThumbnail({
+        videoUrl: originalUrl,
+        thumbnailUrl: thumbnail_url
+      });
+
+    console.log("Thumbnail OK:", result);
+    // result.meta contains { at, width, format, contentType }
+    } catch (err) {
+      console.error("Thumbnail failed:", err);
+      // show toast/snackbar to the user
+    }
 
     return res.json({
       videoId,
@@ -258,17 +278,39 @@ export async function listVideos(req, res, next) {
       cursor = nextCursor;
     }
 
-    return res.json({
-      videos: collected.map((m) => ({
+    // return res.json({
+    //   videos: collected.map((m) => ({
+    //     videoId: m.videoId,
+    //     createdAt: m.createdAt,
+    //     createdBy: m.createdBy,
+    //     fileName: m.fileName,
+    //     title: m.title,
+    //     description: m.description,
+    //   })),
+    //   pagination: { cursor: nextCursor },
+    // });
+
+  // Build response items and attach img_url in parallel
+  const videosWithThumbs = await Promise.all(
+    collected.map(async (m) => {
+      const presigned = await presignGetThumbnailJpg(m.videoId, 90000).catch(() => ({ url: null }));
+      return {
         videoId: m.videoId,
         createdAt: m.createdAt,
         createdBy: m.createdBy,
         fileName: m.fileName,
         title: m.title,
         description: m.description,
-      })),
-      pagination: { cursor: nextCursor },
-    });
+        img_url: presigned?.url || null,   // null if thumbnail not present
+      };
+    })
+  );
+
+  return res.json({
+    videos: videosWithThumbs,
+    pagination: { cursor: nextCursor },
+  });
+
   } catch (e) {
     next(e);
   }
@@ -406,5 +448,54 @@ export async function startTranscode(req, res, next) {
     return res.json({ videoId, variantId, status: 'queued' });
   } catch (e) {
     return next(e);
+  }
+}
+
+// thumbnail api invocation function
+export async function generateThumbnail({
+  apiBase = "http://localhost:5000/api", // e.g., http://localhost:8080
+  videoUrl,
+  thumbnailUrl,
+  at = 2.5,           // seconds into the video
+  width = 640,        // output width
+  format = "jpg",     // "jpg" | "png"
+  amzHeaders = {},    // optional: only include if they were signed (e.g., {"x-amz-acl":"bucket-owner-full-control"})
+  authToken,          // optional: if your API needs JWT
+  timeoutMs = 300000   // cancel if it takes too long
+}) {
+  if (!videoUrl || !thumbnailUrl) {
+    throw new Error("videoUrl and thumbnailUrl are required");
+  }
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`${apiBase}/thumbnail`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({
+        videoUrl,
+        thumbnailUrl,
+        at,
+        width,
+        format,
+        headers: amzHeaders
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      // surface server error details if provided
+      const text = await res.text().catch(() => "");
+      throw new Error(`Thumbnail API ${res.status}: ${text || res.statusText}`);
+    }
+
+    return await res.json(); // { ok: true, message, meta: {...} }
+  } finally {
+    clearTimeout(t);
   }
 }

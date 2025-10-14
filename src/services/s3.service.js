@@ -209,6 +209,18 @@ export async function presignGetObject({ key, expiresSeconds }) {
   return getSignedUrl(s3, get, { expiresIn: Number(expiresSeconds || DEFAULT_TTL) });
 }
 
+export async function presignGetThumbnailJpg(id, expiresSeconds) {
+  const Key = `thumbnail/${id}.jpg`;
+  // Optional existence check: if not found, return null URL (keeps listVideos fast & clean)
+  try { await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key })); }
+  catch { return { url: null, key: Key, exists: false }; }
+
+  const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key }), {
+    expiresIn: Number(expiresSeconds),
+  });
+  return { url, key: Key, exists: true };
+}
+
 export async function downloadToFile({ key, destPath }) {
   const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
   const resp = await s3.send(cmd);
@@ -224,4 +236,22 @@ export async function uploadFromFile({ key, filePath, contentType }) {
   await s3.send(cmd);
 }
 
+export async function presignPutThumbnail({ id, expiresSeconds = 3600, contentType = "image/jpeg" }) {
+  if (!id) throw new Error("id is required");
 
+  // If you want a subfile under the id "folder", pass fileName (e.g., "thumb.jpg")
+  const key = `thumbnail/${id}.jpg`;
+
+  const put = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType, // must match header on upload
+    // If your bucket enforces KMS/ACLs, add them here AND send the same headers when uploading:
+    // ServerSideEncryption: "aws:kms",
+    // SSEKMSKeyId: "arn:aws:kms:ap-southeast-2:<ACCOUNT_ID>:key/<KEY_ID>",
+    // ACL: "bucket-owner-full-control",
+  });
+
+  const thumbnail_url = await getSignedUrl(s3, put, { expiresIn: Number(expiresSeconds) });
+  return { thumbnail_url, key, expiresIn: Number(expiresSeconds) };
+}
