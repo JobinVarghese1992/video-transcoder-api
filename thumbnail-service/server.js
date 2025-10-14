@@ -24,7 +24,7 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("tiny"));
 
-app.get("/api/health", (_req, res) => res.status(200).send("ok"));
+app.get("/api/thumbnail/health", (_req, res) => res.status(200).send("ok"));
 
 // --- helpers ---
 function keyFromS3Url(u) {
@@ -47,7 +47,7 @@ function presignedIsExpired(u) {
 }
 
 // --- route ---
-app.post("/api/thumbnail", async (req, res) => {
+app.post("/api/thumbnail/generate", async (req, res) => {
   const { videoUrl, thumbnailUrl, id } = req.body ?? {};
   const at = Number(req.body?.at ?? 1);
   const width = Number(req.body?.width ?? 512);

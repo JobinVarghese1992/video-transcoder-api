@@ -471,7 +471,7 @@ export async function generateThumbnail({
   const t = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(`${apiBase}/thumbnail`, {
+    const res = await fetch(`${apiBase}/thumbnail/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
