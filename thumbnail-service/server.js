@@ -8,7 +8,7 @@ import { execFile } from "child_process";
 import ffmpegPath from "which";
 
 // ---- Config ----
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8081;
 
 // Try to find ffmpeg in PATH (Dockerfile installs it). If you prefer a JS binary,
 // you could use @ffmpeg-installer/ffmpeg; update ffmpegBinary accordingly.

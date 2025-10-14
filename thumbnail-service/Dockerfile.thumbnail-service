@@ -1,0 +1,15 @@
+# Small Node base
+FROM node:24-alpine
+
+# Install ffmpeg (needed to extract frames)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY . .
+
+EXPOSE 8080
+CMD ["npm", "start"]
