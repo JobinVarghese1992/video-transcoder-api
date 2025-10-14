@@ -24,7 +24,7 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("tiny"));
 
-app.get("/api/healthz", (_req, res) => res.status(200).send("ok"));
+app.get("/api/health", (_req, res) => res.status(200).send("ok"));
 
 // --- helpers ---
 function keyFromS3Url(u) {
@@ -39,10 +39,10 @@ function presignedIsExpired(u) {
     const amzDate = url.searchParams.get("X-Amz-Date");       // 20251014T051321Z
     const expires = parseInt(url.searchParams.get("X-Amz-Expires") || "0", 10);
     if (!amzDate || !expires) return false;
-    const y=+amzDate.slice(0,4), m=+amzDate.slice(4,6)-1, d=+amzDate.slice(6,8);
-    const H=+amzDate.slice(9,11), M=+amzDate.slice(11,13), S=+amzDate.slice(13,15);
-    const signedAt = Date.UTC(y,m,d,H,M,S);
-    return Date.now() > signedAt + expires*1000 - 5000; // treat as expired if within 5s
+    const y = +amzDate.slice(0, 4), m = +amzDate.slice(4, 6) - 1, d = +amzDate.slice(6, 8);
+    const H = +amzDate.slice(9, 11), M = +amzDate.slice(11, 13), S = +amzDate.slice(13, 15);
+    const signedAt = Date.UTC(y, m, d, H, M, S);
+    return Date.now() > signedAt + expires * 1000 - 5000; // treat as expired if within 5s
   } catch { return false; }
 }
 
@@ -101,7 +101,7 @@ app.post("/api/thumbnail", async (req, res) => {
         if (error) { error.stderr = stderr?.toString(); return reject(error); }
         resolve();
       });
-      setTimeout(() => { try { child.kill("SIGKILL"); } catch {} reject(new Error("ffmpeg timed out")); }, 120000);
+      setTimeout(() => { try { child.kill("SIGKILL"); } catch { } reject(new Error("ffmpeg timed out")); }, 120000);
     });
 
     // 3) PUT to presigned URL with ONLY signed headers
@@ -129,8 +129,8 @@ app.post("/api/thumbnail", async (req, res) => {
     }
 
     // cleanup
-    try { if (tmpVideo?.path) await fs.promises.unlink(tmpVideo.path); } catch {}
-    try { if (tmpThumb?.path) await fs.promises.unlink(tmpThumb.path); } catch {}
+    try { if (tmpVideo?.path) await fs.promises.unlink(tmpVideo.path); } catch { }
+    try { if (tmpThumb?.path) await fs.promises.unlink(tmpThumb.path); } catch { }
 
     return res.status(200).json({
       ok: true,
@@ -139,8 +139,8 @@ app.post("/api/thumbnail", async (req, res) => {
       meta: { id, at, width, format: "jpg", contentType: "image/jpeg" },
     });
   } catch (err) {
-    try { if (tmpVideo?.path) await fs.promises.unlink(tmpVideo.path); } catch {}
-    try { if (tmpThumb?.path) await fs.promises.unlink(tmpThumb.path); } catch {}
+    try { if (tmpVideo?.path) await fs.promises.unlink(tmpVideo.path); } catch { }
+    try { if (tmpThumb?.path) await fs.promises.unlink(tmpThumb.path); } catch { }
     return res.status(500).json({ error: "Thumbnail generation/upload failed", detail: err?.message || String(err) });
   }
 });
