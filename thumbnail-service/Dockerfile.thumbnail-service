@@ -1,0 +1,16 @@
+# Dockerfile.thumbnail-service (Alpine)
+FROM node:24-alpine
+
+# Install ffmpeg on Alpine
+RUN apk add --no-cache ffmpeg
+
+WORKDIR /app
+COPY package*.json ./
+
+# If you have package-lock.json => npm ci; otherwise use npm install
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+
+COPY . .
+
+EXPOSE 8080
+CMD ["npm", "start"]
