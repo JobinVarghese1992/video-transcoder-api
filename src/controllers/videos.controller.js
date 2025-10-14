@@ -136,8 +136,8 @@ export async function completeUpload(req, res, next) {
         thumbnailUrl: thumbnail_url
       });
 
-    console.log("Thumbnail OK:", result);
-    // result.meta contains { at, width, format, contentType }
+      console.log("Thumbnail OK:", result);
+      // result.meta contains { at, width, format, contentType }
     } catch (err) {
       console.error("Thumbnail failed:", err);
       // show toast/snackbar to the user
@@ -290,26 +290,26 @@ export async function listVideos(req, res, next) {
     //   pagination: { cursor: nextCursor },
     // });
 
-  // Build response items and attach img_url in parallel
-  const videosWithThumbs = await Promise.all(
-    collected.map(async (m) => {
-      const presigned = await presignGetThumbnailJpg(m.videoId, 90000).catch(() => ({ url: null }));
-      return {
-        videoId: m.videoId,
-        createdAt: m.createdAt,
-        createdBy: m.createdBy,
-        fileName: m.fileName,
-        title: m.title,
-        description: m.description,
-        img_url: presigned?.url || null,   // null if thumbnail not present
-      };
-    })
-  );
+    // Build response items and attach img_url in parallel
+    const videosWithThumbs = await Promise.all(
+      collected.map(async (m) => {
+        const presigned = await presignGetThumbnailJpg(m.videoId, 90000).catch(() => ({ url: null }));
+        return {
+          videoId: m.videoId,
+          createdAt: m.createdAt,
+          createdBy: m.createdBy,
+          fileName: m.fileName,
+          title: m.title,
+          description: m.description,
+          img_url: presigned?.url || null,   // null if thumbnail not present
+        };
+      })
+    );
 
-  return res.json({
-    videos: videosWithThumbs,
-    pagination: { cursor: nextCursor },
-  });
+    return res.json({
+      videos: videosWithThumbs,
+      pagination: { cursor: nextCursor },
+    });
 
   } catch (e) {
     next(e);
@@ -453,7 +453,7 @@ export async function startTranscode(req, res, next) {
 
 // thumbnail api invocation function
 export async function generateThumbnail({
-  apiBase = "http://localhost:5000/api", // e.g., http://localhost:8080
+  apiBase = process.env.THUMBNAIL_SERVICE_URL, // e.g., http://localhost:8080
   videoUrl,
   thumbnailUrl,
   at = 2.5,           // seconds into the video
