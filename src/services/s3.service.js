@@ -11,6 +11,10 @@ import {
   UploadPartCommand,
   HeadObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand, 
+  ListObjectsV2Command,
+  DeleteObjectsCommand
+
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { dirname } from 'node:path';
@@ -254,4 +258,37 @@ export async function presignPutThumbnail({ id, expiresSeconds = 3600, contentTy
 
   const thumbnail_url = await getSignedUrl(s3, put, { expiresIn: Number(expiresSeconds) });
   return { thumbnail_url, key, expiresIn: Number(expiresSeconds) };
+}
+
+// Delete just the original mp4; safe even if it's already gone (S3 delete is idempotent)
+async function deleteOriginalFile({ videoId, fileName }) {
+  const Key = `original/${videoId}/${fileName}`;
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: VIDEO_BUCKET, Key }));
+    console.log(JSON.stringify({ level: "info", msg: "Deleted original file", Key }));
+  } catch (err) {
+    console.warn(JSON.stringify({ level: "warn", msg: "Delete original failed (continuing)", Key, err: String(err) }));
+  }
+}
+
+// delete everything under original/<videoId>/ (if you keep extra sidecars there)
+export async function deleteOriginalFolder({ videoId }) {
+  const Prefix = `original/${videoId}/`;
+  let ContinuationToken;
+  do {
+    const list = await s3.send(new ListObjectsV2Command({ Bucket: VIDEO_BUCKET, Prefix, ContinuationToken }));
+    const objs = list.Contents || [];
+    if (objs.length > 0) {
+      // DeleteObjects supports up to 1000 keys at once
+      for (let i = 0; i < objs.length; i += 1000) {
+        const chunk = objs.slice(i, i + 1000);
+        await s3.send(new DeleteObjectsCommand({
+          Bucket: VIDEO_BUCKET,
+          Delete: { Objects: chunk.map(o => ({ Key: o.Key })), Quiet: true }
+        }));
+      }
+    }
+    ContinuationToken = list.IsTruncated ? list.NextContinuationToken : undefined;
+  } while (ContinuationToken);
+  console.log(JSON.stringify({ level: "info", msg: "Deleted original folder", Prefix }));
 }

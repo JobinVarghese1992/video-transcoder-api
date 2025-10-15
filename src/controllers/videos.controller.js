@@ -15,7 +15,8 @@ import {
   downloadToFile,
   uploadFromFile,
   presignPutThumbnail,
-  presignGetThumbnailJpg
+  presignGetThumbnailJpg,
+  deleteOriginalFolder
 } from '../services/s3.service.js';
 
 import {
@@ -335,6 +336,11 @@ export async function deleteVideo(req, res, next) {
     for (const rk of rks) {
       await deleteByRk({ qutUsername, rk });
     }
+
+    deleteOriginalFolder({ videoId }).catch((e) => {
+      console.error("Failed to delete S3 objects for videoId", videoId, e);
+    });
+    
     return res.json({ videoId });
   } catch (e) {
     next(e);
