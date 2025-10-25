@@ -11,7 +11,7 @@ import {
   UploadPartCommand,
   HeadObjectCommand,
   GetObjectCommand,
-  DeleteObjectCommand, 
+  DeleteObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand
 
@@ -264,7 +264,7 @@ export async function presignPutThumbnail({ id, expiresSeconds = 3600, contentTy
 async function deleteOriginalFile({ videoId, fileName }) {
   const Key = `original/${videoId}/${fileName}`;
   try {
-    await s3.send(new DeleteObjectCommand({ Bucket: VIDEO_BUCKET, Key }));
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key }));
     console.log(JSON.stringify({ level: "info", msg: "Deleted original file", Key }));
   } catch (err) {
     console.warn(JSON.stringify({ level: "warn", msg: "Delete original failed (continuing)", Key, err: String(err) }));
@@ -276,14 +276,14 @@ export async function deleteOriginalFolder({ videoId }) {
   const Prefix = `original/${videoId}/`;
   let ContinuationToken;
   do {
-    const list = await s3.send(new ListObjectsV2Command({ Bucket: VIDEO_BUCKET, Prefix, ContinuationToken }));
+    const list = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix, ContinuationToken }));
     const objs = list.Contents || [];
     if (objs.length > 0) {
       // DeleteObjects supports up to 1000 keys at once
       for (let i = 0; i < objs.length; i += 1000) {
         const chunk = objs.slice(i, i + 1000);
         await s3.send(new DeleteObjectsCommand({
-          Bucket: VIDEO_BUCKET,
+          Bucket: BUCKET,
           Delete: { Objects: chunk.map(o => ({ Key: o.Key })), Quiet: true }
         }));
       }
