@@ -7,11 +7,8 @@ import path from "path";
 import { execFile } from "child_process";
 import ffmpegPath from "which";
 
-// ---- Config ----
 const PORT = process.env.PORT || 8081;
 
-// Try to find ffmpeg in PATH (Dockerfile installs it). If you prefer a JS binary,
-// you could use @ffmpeg-installer/ffmpeg; update ffmpegBinary accordingly.
 let ffmpegBinary = "ffmpeg";
 try {
   ffmpegBinary = ffmpegPath.sync("ffmpeg");
@@ -26,38 +23,34 @@ app.use(morgan("tiny"));
 
 app.get("/api/thumbnail/health", (_req, res) => res.status(200).send("ok"));
 
-// --- helpers ---
 function keyFromS3Url(u) {
   const url = new URL(u);
-  // e.g. /thumbnail/vid_123.jpg  ->  thumbnail/vid_123.jpg
   return decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 }
 
 function presignedIsExpired(u) {
   try {
     const url = new URL(u);
-    const amzDate = url.searchParams.get("X-Amz-Date");       // 20251014T051321Z
+    const amzDate = url.searchParams.get("X-Amz-Date");
     const expires = parseInt(url.searchParams.get("X-Amz-Expires") || "0", 10);
     if (!amzDate || !expires) return false;
     const y = +amzDate.slice(0, 4), m = +amzDate.slice(4, 6) - 1, d = +amzDate.slice(6, 8);
     const H = +amzDate.slice(9, 11), M = +amzDate.slice(11, 13), S = +amzDate.slice(13, 15);
     const signedAt = Date.UTC(y, m, d, H, M, S);
-    return Date.now() > signedAt + expires * 1000 - 5000; // treat as expired if within 5s
+    return Date.now() > signedAt + expires * 1000 - 5000;
   } catch { return false; }
 }
 
-// --- route ---
 app.post("/api/thumbnail/generate", async (req, res) => {
   const { videoUrl, thumbnailUrl, id } = req.body ?? {};
   const at = Number(req.body?.at ?? 1);
   const width = Number(req.body?.width ?? 512);
-  const extraHeaders = req.body?.headers ?? {}; // ONLY ones that were signed
+  const extraHeaders = req.body?.headers ?? {};
 
   if (!videoUrl || !thumbnailUrl || !id) {
     return res.status(400).json({ error: "Missing required fields: videoUrl, thumbnailUrl, id" });
   }
 
-  // Enforce exact key: thumbnail/<id>.jpg
   const expectedKey = `thumbnail/${id}.jpg`;
   const actualKey = keyFromS3Url(thumbnailUrl);
   if (actualKey !== expectedKey) {
@@ -70,7 +63,6 @@ app.post("/api/thumbnail/generate", async (req, res) => {
 
   let tmpVideo, tmpThumb;
   try {
-    // 1) Download video locally
     tmpVideo = await tmpFile({ postfix: ".mp4", keep: true, detachDescriptor: true });
     const resp = await axios.get(videoUrl, { responseType: "stream", validateStatus: s => s < 400 });
     await new Promise((resolve, reject) => {
@@ -81,7 +73,6 @@ app.post("/api/thumbnail/generate", async (req, res) => {
       ws.on("error", reject);
     });
 
-    // 2) Generate a Finder/Preview-friendly JPEG
     tmpThumb = await tmpFile({ postfix: ".jpg", keep: true, detachDescriptor: true });
     const outPath = tmpThumb.path;
 
@@ -104,7 +95,6 @@ app.post("/api/thumbnail/generate", async (req, res) => {
       setTimeout(() => { try { child.kill("SIGKILL"); } catch { } reject(new Error("ffmpeg timed out")); }, 120000);
     });
 
-    // 3) PUT to presigned URL with ONLY signed headers
     const data = await fs.promises.readFile(outPath);
     const urlObj = new URL(thumbnailUrl);
     const signedHeaders = (urlObj.searchParams.get("X-Amz-SignedHeaders") || "host")
@@ -113,7 +103,6 @@ app.post("/api/thumbnail/generate", async (req, res) => {
     const headers = { "Content-Length": data.length };
     if (signedHeaders.includes("content-type")) headers["Content-Type"] = "image/jpeg";
 
-    // only forward x-amz-* that were signed
     for (const [k, v] of Object.entries(extraHeaders || {})) {
       const kl = k.toLowerCase();
       if (kl.startsWith("x-amz-") && signedHeaders.includes(kl)) headers[k] = v;
@@ -128,7 +117,6 @@ app.post("/api/thumbnail/generate", async (req, res) => {
       throw new Error(`Upload failed with status ${putResp.status}: ${putResp.data || ""}`);
     }
 
-    // cleanup
     try { if (tmpVideo?.path) await fs.promises.unlink(tmpVideo.path); } catch { }
     try { if (tmpThumb?.path) await fs.promises.unlink(tmpThumb.path); } catch { }
 
